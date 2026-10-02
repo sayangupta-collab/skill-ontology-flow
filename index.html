@@ -346,6 +346,7 @@ const lerp=(a,b,t)=>a+(b-a)*t;
 const PNAME={"C-2041":"Marcus Reid","C-2057":"Priya Nair","C-2063":"Diego Alvarez","C-2072":"Hannah Weiss","C-2088":"Tomas Novak","C-2095":"Aisha Khan","C-2101":"Liam O'Connor","C-2110":"Sofia Marino","C-2123":"Kwame Mensah","C-2130":"Elena Petrova"};
 POOL.forEach(c=>{c.name=PNAME[c.id];c.first=c.name.split(" ")[0]});
 const TNAME={"T-1001":"Marcus Reid","T-1003":"Priya Nair","T-1006":"Hannah Weiss","T-1007":"Diego Alvarez","T-1009":"Aisha Khan","T-1010":"Liam O'Connor","T-1012":"Kwame Mensah","T-1014":"Elena Petrova","T-1002":"Noah Fischer","T-1011":"Rahul Verma"};
+POOL.find(c=>c.id==="C-2057").ev.forEach(e=>{if(e[0]==="python"||e[0]==="rest")e[1]="V"});
 const MLABEL={"T-1001":"Sr. Backend Dev","T-1003":"Backend Engineer II","T-1006":"Front-end Dev (React)","T-1007":"UI Engineer","T-1009":"Data Analyst","T-1010":"BI Analyst","T-1012":"CSM, panel round","T-1014":"Customer Success Lead","T-1002":"Senior Backend Eng.","T-1011":"Customer Success Mgr."};
 let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
 
@@ -359,7 +360,7 @@ const svg=$("#stage");
 const defs=S("defs",null,svg);
 S("filter",{id:"glw",x:"-50%",y:"-50%",width:"200%",height:"200%"},defs).innerHTML='<feGaussianBlur stdDeviation="4"/>';
 const gs=[];
-for(let i=0;i<8;i++){const g=S("g",{class:"stg",opacity:0,"pointer-events":"none"},svg);gs.push(g)}
+for(let i=0;i<9;i++){const g=S("g",{class:"stg",opacity:0,"pointer-events":"none"},svg);gs.push(g)}
 /* gs[0..4] = Match, Learn, Save, Use cases, Recommendation; gs[5] = overview; gs[6] = why; gs[7] = summary */
 
 /* ---------- tooltips ---------- */
@@ -645,7 +646,7 @@ const UCS=[
  ["Candidate recommendation","Ranks the people already in your pool for an open workflow, with reasons.","Recruiters, Hiring managers",REC_PARTS],
  ["Skill search","Search a skill and also find its other names and neighbouring skills.","Recruiters",["graph"]],
  ["Job description check","Flags too many must-haves, missing ones, or skills you never assess.","Recruiters, TA leaders",["jobs","cand"]],
- ["Interview guides","Suggests questions for a candidate's unproven must-have skills.","Interviewers",["cand"]],
+ ["Interview guides","Suggests questions for a candidate's unproven must-have skills.","Interviewers",["jobs","cand","graph"]],
  ["Assessment design","Maps assessment sections to must-have skills. Nothing tested twice.","Assessment designers",["jobs"]],
  ["Evaluator calibration","Shows who scores a skill harder or softer than peers.","TA leaders",["eval"]],
  ["Talent pool insights","Shows how deep your proven skills are against open roles.","Leadership",["cand","jobs"]],
@@ -917,6 +918,236 @@ function recCamera(){
   rec.ps=1.02;rec.px=600-REC_XS[sub]*rec.ps;rec.py=365;
 }
 
+/* ======================= INTERVIEW GUIDES ======================= */
+const GCAND={be:"C-2057",fe:"C-2063",da:"C-2095",csm:"C-2123"};
+const GROUND={be:"Technical round",fe:"Technical round",da:"Technical round",csm:"Panel round"};
+const QB={
+ python:["Walk me through a Python service you built end to end. What did you own?","A Python service slows down under load. How would you find the cause and fix it?","Profiling, async versus threads, clear trade-offs"],
+ rest:["How do you design an API so other teams can use it without asking you questions?","A client needs a breaking change. How do you roll it out?","Versioning, backwards compatibility, error design"],
+ sysdes:["Describe the last system you designed. Which alternatives did you reject, and why?","Design an order service that must handle ten times today's traffic.","Trade-offs, data flow, failure modes"],
+ micro:["When would you split a service into microservices, and when would you not?","Two services keep breaking each other. How do you untangle them?","Boundaries, ownership, data consistency"],
+ sql:["How would you find the ten slowest queries and speed one up?","Design the tables for orders and refunds. Which indexes would you add?","Indexes, joins, reading a query plan"],
+ prob:["Tell me about a hard bug you could not reproduce. How did you find the cause?","Production is failing and the logs say nothing useful. Where do you start?","A method, clear hypotheses, calm under pressure"],
+ react:["How do you decide where state lives in a React app?","A page re-renders too often. How do you find and fix it?","State placement, memoisation, profiling"],
+ js:["Explain how closures and the event loop affect the code you write.","A click handler sometimes runs twice. Walk me through finding out why.","Event loop, scope, debugging habits"],
+ ts:["How do types help your team, and where do they get in the way?","You inherit untyped code. How do you add types safely?","Gradual typing, generics, pragmatism"],
+ html:["How do you structure a page so it works without heavy scripting?","A layout breaks on small screens. How do you fix it?","Semantic markup, responsive layout, CSS depth"],
+ a11y:["How do you check that a screen reader user can finish a task on your page?","A custom dropdown is not keyboard friendly. How do you fix it?","Focus handling, labels, testing with real tools"],
+ perf:["How do you measure whether a page feels fast?","A product page loads slowly on mobile. What do you check first?","Metrics, bundle size, images, caching"],
+ comm:["Tell me about explaining a hard idea to someone non-technical.","Two stakeholders want opposite things. How do you handle the conversation?","Clarity, listening, adapting to the audience"],
+ excel:["Describe a spreadsheet model you built that others relied on.","Your totals do not match the source data. How do you track down the gap?","Formulas, checks, structure"],
+ powerbi:["Walk me through a dashboard you built. Who used it and what changed?","A report is slow and the numbers look wrong. How do you debug it?","Data model, measures, performance"],
+ stats:["How do you decide whether a change in a metric is real or noise?","An experiment shows a small lift. Would you ship it?","Significance, sample size, practical impact"],
+ viz:["How do you choose a chart for a message you need to land?","A leader misreads your chart. What do you change?","Clarity, audience, honest scales"],
+ stake:["Tell me about a stakeholder who disagreed with you. What happened?","A sponsor goes quiet before renewal. What do you do this week?","Relationship building, directness"],
+ renew:["How do you spot an account at risk of leaving early?","A key customer says they will not renew. What are your first 48 hours?","Early signals, escalation, a recovery plan"],
+ empathy:["Tell me about a time you changed your approach after hearing a customer out.","A customer is upset about a mistake that was not yours. What do you say?","Listening, ownership, tone"],
+ acct:["How do you plan a year for a large account?","You have forty accounts and time for ten deep reviews. How do you choose?","Prioritisation, goals, structure"],
+ conflict:["Describe a heated conversation you turned around.","A customer threatens to leave in a live call. What do you do in the next five minutes?","Staying calm, de-escalation, next steps"],
+ kafka:["Tell me about a system where you used Kafka. Which guarantees did you rely on?","A consumer falls behind and messages pile up. What do you do?","Ordering, retries, consumer lag"],
+ docker:["How do you keep a container image small, secure and repeatable?","A container works on your laptop but fails in production. Where do you look?","Layers, config, reproducibility"],
+ aws:["Which AWS services have you run in production, and what went wrong once?","Your monthly bill doubles overnight. How do you find out why?","Cost awareness, monitoring, ownership"],
+ pg:["How do you decide between a join, a subquery and a materialised view in Postgres?","A table grows to a billion rows. What changes?","Indexing, partitioning, vacuum and locks"],
+ k8s:["What does Kubernetes give your team that plain servers did not?","A pod keeps restarting. Walk me through your debugging.","Probes, resources, logs and events"],
+ crm:["How do you keep your CRM useful rather than a chore?","Your pipeline data is out of date before a forecast. What do you do?","Habits, data quality, using it to decide"]
+};
+const GSTEPS=["Open the interview","Check what's proven","Pick what to ask","Write the questions","Show it in the interview"];
+const GCAP=[
+  ["Open the interview","Search: the job's skills and their weights"],
+  ["Check what's proven","Search: this person's evidence"],
+  ["Pick what to ask","Rank: biggest gaps on the most important skills"],
+  ["Write the questions","Search: skill, related skills, other names"],
+  ["Show it in the interview","Questions appear on the interviewer's screen"]
+];
+const STL={V:["Proven","#3DC9AE"],D:["Shown","#2E8F82"],C:["Stated","#8CA39E"],A:["Related","#6CD0F5"],X:["None","#2A3B57"]};
+function wrapTxt(t,n){const w=t.split(" "),L=[];let l="";w.forEach(x=>{if((l+" "+x).trim().length>n){L.push(l.trim());l=x}else l=l+" "+x});if(l.trim())L.push(l.trim());return L}
+function stPill(parent,x,y,st,w){
+  w=w||76;const d=STL[st],g=S("g",{transform:`translate(${x} ${y})`},parent);
+  const fill=st==="V"||st==="D"?d[1]:st==="X"?"#2A3B57":"none";
+  S("rect",{x:-w/2,y:-11,width:w,height:22,rx:11,fill,stroke:st==="C"||st==="A"?d[1]:"none","stroke-width":1.8,"stroke-dasharray":st==="C"?"4 3":st==="A"?"2 3":""},g);
+  T(g,0,0,d[0],{size:11.5,w:600,fill:st==="V"||st==="D"?"#06121C":st==="X"?"#9DB1CB":"#EAF1F8"});
+  return g;
+}
+function gdPlan(){
+  const c=POOL.find(x=>x.id===GCAND[ROLE]);
+  const rows=bp(ROLE).filter(x=>x.cls!=="N").map(r=>{
+    const b=bestFor(c,r.id),st=b?(b.kind==="a"?"A":b.lv):"X",cr=b?Math.min(1,b.v):0;
+    return {r,id:r.id,st,b,p:st==="V"?r.w*.04:r.w*(1-cr)};
+  });
+  const ranked=[...rows].sort((a,b)=>b.p-a.p),K=Math.max(1,Math.min(4,ranked.filter(x=>x.p>.12).length));
+  const mins=Math.max(5,Math.round(36/K/5)*5);
+  return {c,rows,ranked,picks:ranked.slice(0,K),K,mins,proven:rows.filter(x=>x.st==="V").length};
+}
+function gdQuestion(row){
+  const qb=QB[row.id]||["Tell me about your experience with "+SK[row.id].name+".","Walk me through a hard problem involving "+SK[row.id].name+".","Specific examples"];
+  if(row.st==="A")return {approach:"Bridge from "+SK[row.b.via].name,q:"You have worked with "+SK[row.b.via].name+". "+qb[0],listen:qb[2]};
+  if(row.st==="D")return {approach:"Go deeper",q:qb[1],listen:qb[2]};
+  if(row.st==="C")return {approach:"Verify the claim",q:qb[0],listen:qb[2]};
+  return {approach:"Start with basics",q:qb[0],listen:qb[2]};
+}
+const gd={g:gs[8],dyn:null,st:[],stg:[],lbls:[],T:[0,0,0,0,0],tx:0,ty:360,s:1,px:0,py:360,ps:1};
+function gS1(g){
+  const pl=gdPlan(),c=pl.c,items=[];
+  S("rect",{x:-250,y:-196,width:330,height:92,rx:14,fill:"#15253F",stroke:"#6CD0F5","stroke-width":3},g);
+  T(g,-234,-176,"INTERVIEW SCHEDULED",{size:10.5,mono:true,w:600,fill:"#6CD0F5",anchor:"start"});
+  T(g,-234,-151,c.name,{size:22,w:700,anchor:"start"});
+  T(g,-234,-124,ROLES[ROLE].title+" · "+GROUND[ROLE]+" · 45 min",{size:12.5,fill:"#9DB1CB",anchor:"start"});
+  S("path",{d:"M-195 -102 v66",stroke:"#6CD0F5","stroke-width":2.5,fill:"none"},g);S("path",{d:"M-203 -40 l8 12 l8 -12 z",fill:"#6CD0F5"},g);
+  const slab=S("rect",{x:-250,y:-26,width:110,height:48,rx:9,fill:PARTC.jobs},g);tip(slab,PARTN.jobs,PARTT.jobs);
+  T(g,-195,-2,"Jobs and skills",{size:12.5,w:600,fill:"#06121C"});
+  const ring=S("circle",{cx:-195,cy:-2,r:20,fill:"none",stroke:"#F0A04F","stroke-width":3},g);
+  [["C",-30,"Must have"],["S",120,"Nice to have"]].forEach(([k,y,nm])=>{
+    S("rect",{x:-110,y:y+30,width:360,height:4,rx:2,fill:"#6a86ad",opacity:.45},g);
+    T(g,-110,y+52,nm,{size:12.5,w:600,fill:"#9DB1CB",anchor:"start"});
+    const arr=pl.rows.filter(x=>x.r.cls===k).sort((a,b)=>b.r.w-a.r.w),n=arr.length,sp=Math.min(60,340/Math.max(1,n));
+    arr.forEach((x,i)=>{
+      const sk=SK[x.id],r=8+9*x.r.w,px=-84+i*sp,py=y+30-r-2;
+      const cc=S("circle",{cx:px,cy:py,r,fill:DOMC[sk.dom]},g);tip(cc,sk.name,CLS[k]+" · weight "+x.r.w.toFixed(2));
+      const lab=T(g,px,py-r-10-(i%3)*14,sk.name,{size:11.5,w:500});
+      items.push({c:cc,lab,r,delay:(px+110)/360*1.4+.5});
+    });
+  });
+  return {update(t){
+    const tt=REDUCED?99:t%9,u=clamp01(tt/2);
+    ring.setAttribute("cx",lerp(-195,250,u));ring.setAttribute("r",20+u*50);ring.setAttribute("opacity",(1-u).toFixed(2));
+    items.forEach(it=>{const p=easeOut(clamp01((tt-it.delay)/.5));it.c.setAttribute("r",(it.r*p).toFixed(2));it.lab.setAttribute("opacity",p)});
+  }};
+}
+function gS2(g){
+  const pl=gdPlan(),c=pl.c,items=[];
+  S("rect",{x:-250,y:-60,width:130,height:60,rx:10,fill:"#15253F",stroke:"#3A5680","stroke-width":2.5},g);
+  T(g,-238,-42,c.name,{size:14.5,w:700,anchor:"start"});T(g,-238,-20,c.note,{size:10.5,fill:"#9DB1CB",anchor:"start"});
+  const slab=S("rect",{x:-250,y:20,width:130,height:46,rx:9,fill:PARTC.cand},g);tip(slab,PARTN.cand,PARTT.cand);
+  T(g,-185,43,"People and evidence",{size:11.5,w:600,fill:"#06121C"});
+  const ring=S("circle",{cx:-185,cy:43,r:18,fill:"none",stroke:"#3DC9AE","stroke-width":3},g);
+  const n=pl.rows.length,step=Math.min(30,330/n),y0=-((n-1)*step)/2;
+  T(g,-90,y0-26,"Skill",{size:11,mono:true,fill:"#6a86ad",anchor:"start"});T(g,150,y0-26,"Evidence",{size:11,mono:true,fill:"#6a86ad"});
+  pl.rows.forEach((x,i)=>{
+    const y=y0+i*step,gg=S("g",{opacity:0},g);
+    S("rect",{x:-96,y:y-13,width:360,height:26,rx:7,fill:i%2?"rgba(255,255,255,.02)":"rgba(255,255,255,.045)"},gg);
+    T(gg,-84,y,SK[x.id].name,{size:13,w:x.r.cls==="C"?600:500,anchor:"start",fill:x.r.cls==="C"?"#EAF1F8":"#B9C8DC"});
+    stPill(gg,150,y,x.st);
+    if(x.st==="A")T(gg,222,y,"via "+SK[x.b.via].name.slice(0,9),{size:9.5,fill:"#6CD0F5",anchor:"middle"});
+    tip(gg,SK[x.id].name,(x.r.cls==="C"?"Must have":"Nice to have")+" · "+STL[x.st][0]);
+    items.push({gg,delay:1+i*.16});
+  });
+  return {update(t){
+    const tt=REDUCED?99:t%10,u=clamp01(tt/1.1);
+    ring.setAttribute("cx",lerp(-185,260,u));ring.setAttribute("r",18+u*50);ring.setAttribute("opacity",(1-u).toFixed(2));
+    items.forEach(it=>it.gg.setAttribute("opacity",easeOut(clamp01((tt-it.delay)/.4))));
+  }};
+}
+function gS3(g){
+  const pl=gdPlan(),items=[],n=pl.ranked.length,step=Math.min(30,330/n),y0=-((n-1)*step)/2,isPick=id=>pl.picks.some(p=>p.id===id);
+  /* time donut */
+  const cx=-190,cy=-15,R=46;
+  S("circle",{cx,cy,r:R,fill:"none",stroke:"#2A3B57","stroke-width":16},g);
+  for(let k=0;k<pl.K;k++){
+    const a0=-Math.PI/2+k/pl.K*Math.PI*2+.06,a1=-Math.PI/2+(k+1)/pl.K*Math.PI*2-.06;
+    S("path",{d:`M${cx+R*Math.cos(a0)} ${cy+R*Math.sin(a0)} A${R} ${R} 0 ${a1-a0>Math.PI?1:0} 1 ${cx+R*Math.cos(a1)} ${cy+R*Math.sin(a1)}`,fill:"none",stroke:"#6CD0F5","stroke-width":16,opacity:.5+.5*(k%2)},g);
+  }
+  T(g,cx,cy-8,"45",{size:26,w:700});T(g,cx,cy+16,"minutes",{size:11,fill:"#9DB1CB"});
+  T(g,cx,cy+R+34,`${pl.K} topics`,{size:13,w:600,fill:"#6CD0F5"});T(g,cx,cy+R+52,`about ${pl.mins} min each`,{size:12,fill:"#9DB1CB"});
+  T(g,34,y0-26,"Biggest gap × importance",{size:11,mono:true,fill:"#6a86ad",anchor:"start"});
+  pl.ranked.forEach((x,i)=>{
+    const y=y0+i*step,pk=isPick(x.id),gg=S("g",null,g);
+    T(gg,24,y,SK[x.id].name,{size:12.5,w:pk?700:500,anchor:"end",fill:pk?"#EAF1F8":"#8DA0B8"});
+    S("rect",{x:34,y:y-7,width:200,height:14,rx:7,fill:"#15253F"},gg);
+    const bar=S("rect",{x:34,y:y-7,width:0,height:14,rx:7,fill:pk?"#6CD0F5":"#44566F"},gg);
+    const tg=T(gg,34+x.p*190+12,y,pk?"Ask":(x.st==="V"?"Skip, proven":"Later"),{size:11,w:600,anchor:"start",fill:pk?"#6CD0F5":"#6a86ad",op:0});
+    tip(gg,SK[x.id].name,STL[x.st][0]+" · weight "+x.r.w.toFixed(2)+(pk?". Picked for this interview.":""));
+    items.push({bar,tg,w:Math.max(4,x.p*190),delay:.5+i*.14});
+  });
+  return {update(t){
+    const tt=REDUCED?99:t%10;
+    items.forEach(it=>{const p=easeOut(clamp01((tt-it.delay)/.7));it.bar.setAttribute("width",(it.w*p).toFixed(1));it.tg.setAttribute("opacity",p)});
+  }};
+}
+function gS4(g){
+  const pl=gdPlan(),items=[],K=pl.K;
+  pl.picks.forEach((x,i)=>{
+    const y=(i-(K-1)/2)*104,q=gdQuestion(x),gg=S("g",{opacity:0},g);
+    const sk=SK[x.id];
+    S("rect",{x:-250,y:y-28,width:122,height:56,rx:10,fill:"#15253F",stroke:DOMC[sk.dom],"stroke-width":2.5},gg);
+    T(gg,-189,y-11,sk.name,{size:12.5,w:700});
+    stPill(gg,-189,y+11,x.st,64);
+    S("path",{d:`M-124 ${y} h20`,stroke:"#6CD0F5","stroke-width":2.5,fill:"none"},gg);S("path",{d:`M-108 ${y-6} l9 6 l-9 6 z`,fill:"#6CD0F5"},gg);
+    S("rect",{x:-96,y:y-44,width:356,height:88,rx:12,fill:"#14233B",stroke:"#3A5680","stroke-width":2},gg);
+    T(gg,-84,y-32,q.approach.toUpperCase(),{size:9.5,mono:true,w:600,fill:"#F0A04F",anchor:"start"});
+    wrapTxt(q.q,56).slice(0,3).forEach((l,k)=>T(gg,-84,y-15+k*15,l,{size:12.5,fill:"#EAF1F8",anchor:"start"}));
+    T(gg,-84,y+33,"Listen for: "+q.listen,{size:10.5,fill:"#6CD0F5",anchor:"start"});
+    tip(gg,sk.name+": "+q.approach,q.q+" Listen for: "+q.listen+".");
+    items.push({gg,delay:.5+i*.7});
+  });
+  const note=T(g,5,228,"Wording follows the skill's other names and related skills",{size:11.5,fill:"#9DB1CB",op:0});
+  return {update(t){
+    const tt=REDUCED?99:t%12;
+    items.forEach(it=>{const p=easeOut(clamp01((tt-it.delay)/.6));it.gg.setAttribute("opacity",p);it.gg.setAttribute("transform",`translate(${(1-p)*30} 0)`)});
+    note.setAttribute("opacity",clamp01((tt-3.2)/.6));
+  }};
+}
+function gS5(g){
+  const pl=gdPlan(),c=pl.c,K=pl.K,qs=pl.picks.map(gdQuestion);
+  S("rect",{x:-240,y:-186,width:500,height:344,rx:16,fill:"#0f1c30",stroke:"#3A5680","stroke-width":2.5},g);
+  S("path",{d:"M-240 -170 a16 16 0 0 1 16 -16 h468 a16 16 0 0 1 16 16 v22 h-500 z",fill:"#15253F"},g);
+  [0,1,2].forEach(i=>S("circle",{cx:-222+i*14,cy:-168,r:4,fill:["#FF6B5E","#F0A04F","#3DC9AE"][i]},g));
+  T(g,-170,-168,"Interview guide · "+c.name,{size:12.5,w:600,anchor:"start"});
+  const timer=T(g,244,-168,"00:00",{size:13,mono:true,w:600,anchor:"end",fill:"#6CD0F5"});
+  const rowH=Math.min(72,(280-0)/K),y0=-142,rows=[];
+  pl.picks.forEach((x,i)=>{
+    const y=y0+i*rowH,gg=S("g",null,g),sk=SK[x.id];
+    const hl=S("rect",{x:-228,y:y,width:476,height:rowH-6,rx:10,fill:"rgba(108,208,245,.12)",stroke:"#6CD0F5","stroke-width":1.5,opacity:0},gg);
+    S("circle",{cx:-208,cy:y+rowH/2-3,r:11,fill:DOMC[sk.dom]},gg);T(gg,-208,y+rowH/2-3,String(i+1),{size:12,w:700,fill:"#06121C"});
+    T(gg,-188,y+12,sk.name+" · "+pl.mins+" min",{size:10.5,mono:true,fill:"#9DB1CB",anchor:"start"});
+    wrapTxt(qs[i].q,66).slice(0,2).forEach((l,k)=>T(gg,-188,y+29+k*15,l,{size:12,fill:"#EAF1F8",anchor:"start"}));
+    const dots=[];for(let d=0;d<5;d++)dots.push(S("circle",{cx:180+d*13,cy:y+12,r:4.5,fill:"none",stroke:"#6a86ad","stroke-width":1.5},gg));
+    rows.push({hl,dots,sc:[4,3,5,4][i]});
+  });
+  const foot=S("g",{opacity:.35},g);
+  S("rect",{x:-228,y:128,width:476,height:24,rx:8,fill:"rgba(61,201,174,.15)"},foot);
+  T(foot,-216,140,"✓ Scores save to "+c.first+"'s evidence as Validated",{size:12,w:600,fill:"#3DC9AE",anchor:"start"});
+  S("path",{d:"M222 140 l12 -6 v12 z",fill:"#3DC9AE"},foot);
+  return {update(t){
+    const tt=REDUCED?99:t,per=3.4,cur=REDUCED?K:Math.floor((tt%(per*(K+1.6)))/per);
+    const secs=REDUCED?1260:((tt*22)%2700);timer.textContent=String(Math.floor(secs/60)).padStart(2,"0")+":"+String(Math.floor(secs%60)).padStart(2,"0");
+    rows.forEach((r,i)=>{
+      r.hl.setAttribute("opacity",i===cur?1:0);
+      const filled=i<cur?r.sc:(i===cur?Math.min(r.sc,Math.floor(((tt%per)/per)*(r.sc+1))):0);
+      r.dots.forEach((d,k)=>{d.setAttribute("fill",k<filled?"#3DC9AE":"none");d.setAttribute("stroke",k<filled?"#3DC9AE":"#6a86ad")});
+    });
+    foot.setAttribute("opacity",cur>=K?1:.35);
+  }};
+}
+function gdBuild(){
+  if(gd.dyn)gd.dyn.remove();
+  gd.dyn=S("g",null,gd.g);gd.st=[];gd.stg=[];gd.lbls=[];
+  const fns=[gS1,gS2,gS3,gS4,gS5];
+  REC_XS.forEach((x,i)=>{
+    const g=S("g",{transform:`translate(${x} 0)`},gd.dyn);gd.stg.push(g);
+    S("circle",{cx:0,cy:0,r:250,fill:"rgba(28,51,84,.18)",stroke:"#2f5a8f","stroke-opacity":.5,"stroke-width":2,"pointer-events":"none"},g);
+    const inner=S("g",null,g);gd.st.push(fns[i](inner));
+  });
+  gd.T=[0,0,0,0,0];
+}
+function gdUpdate(dt){
+  gd.T=gd.T.map(t=>t+dt);
+  gd.st.forEach((s,i)=>s.update(gd.T[i],dt));
+  const k=1-Math.exp(-dt*4);
+  gd.tx+=(gd.px-gd.tx)*k;gd.ty+=(gd.py-gd.ty)*k;gd.s+=(gd.ps-gd.s)*k;
+  gd.dyn.setAttribute("transform",`translate(${gd.tx.toFixed(1)} ${gd.ty.toFixed(1)}) scale(${gd.s.toFixed(4)})`);
+  gd.stg.forEach((g,i)=>{const o=cur!==6||i===sub?1:0;const c=+(g.getAttribute("opacity")||1);g.setAttribute("opacity",(c+(o-c)*k).toFixed(3))});
+}
+function guideStory(j){
+  const pl=gdPlan(),nC=pl.rows.filter(x=>x.r.cls==="C").length,gaps=pl.rows.length-pl.proven,job=ROLES[ROLE].title;
+  return [
+    [["IN","An interview is booked: "+pl.c.name+" for "+job],["OUT",pl.rows.length+" skills the job needs, "+nC+" of them must-haves"],["WHY","Questions come from what this job really needs"]],
+    [["IN","Those "+pl.rows.length+" skills and "+pl.c.first+"'s evidence"],["OUT",pl.proven+" already proven, "+gaps+" still to confirm"],["WHY","Don't re-ask what earlier interviews already proved"]],
+    [["IN",gaps+" skills still to confirm"],["OUT","The top "+pl.K+" for a 45-minute round, about "+pl.mins+" min each"],["WHY","Biggest gaps on the most important skills first"]],
+    [["IN","Each picked skill and its evidence level"],["OUT",pl.K+" questions, each with what to listen for"],["WHY","Basics for unproven skills, deeper scenarios for shown ones"]],
+    [["IN","The guide"],["OUT","Questions on the interviewer's screen, live"],["WHY","Scores flow back as validated evidence for next time"]]
+  ][j];
+}
+
 /* ======================= OVERVIEW ======================= */
 const ov={g:gs[5],t:0,dots:[]};
 (function(){
@@ -1041,7 +1272,8 @@ const CAPS={
   2:["Save it once, privately per company","Hover the database parts"],
   3:["Every use case just searches it","Click a card to see its searches"],
   4:["Candidate recommendation for an open workflow","Step through the searches"],
-  5:["What your company gets","Evidence-based, private, reusable"]
+  5:["What your company gets","Evidence-based, private, reusable"],
+  6:["Interview guides, built from the skill ontology","Step through the searches"]
 };
 const STORY={
   "-2":[["WHAT","A skill ontology is your company's map of every skill it hires for, how skills relate, and what each job needs."],["HOW","Built from your own interviews, saved once, searched by every use case."]],
@@ -1076,21 +1308,23 @@ const SUBCAP=[
   ["Remove anyone not eligible","Search: consent, blacklist, cool-off, retention"],
   ["Rank with reasons","Hover a bar"]
 ];
-const SEQ=[[-2,0],[-1,0],[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[4,2],[4,3],[4,4],[5,0]];
-const HASHES=["why","flow","match","learn","save","usecases","recommendation","summary"];
+const SEQ=[[-2,0],[-1,0],[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[4,2],[4,3],[4,4],[6,0],[6,1],[6,2],[6,3],[6,4],[5,0]];
+const HASHES=["why","flow","match","learn","save","usecases","recommendation","summary","interviewguides"];
 let cur=-2,sub=0;
-const stageOf=i=>i===-2?6:i===-1?5:i===5?7:i;
+const stageOf=i=>i===-2?6:i===-1?5:i===5?7:i===6?8:i;
 function setStory(){
-  const rows=cur===4?recStory(sub):(STORY[cur]||[]);
+  const rows=cur===4?recStory(sub):cur===6?guideStory(sub):(STORY[cur]||[]);
   $("#story").innerHTML=rows.map(r=>`<div class="r"><span class="k${r[0]==="WHY"?" w":""}">${r[0]}</span><span class="v">${esc(r[1])}</span></div>`).join("");
 }
 function setCaption(){
   if(cur===4){$("#cap").textContent=SUBCAP[sub][0];$("#hint").textContent=SUBCAP[sub][1]}
+  else if(cur===6){$("#cap").textContent=GCAP[sub][0];$("#hint").textContent=GCAP[sub][1]}
   else{$("#cap").textContent=CAPS[cur][0];$("#hint").textContent=CAPS[cur][1]}
   setStory();layoutStage();
 }
 function applyRecCam(){
-  if(cur===4){rec.ps=Math.min(VW*.94/540,VH*.97/510,2.6);rec.px=600-REC_XS[sub]*rec.ps;rec.py=360}
+  const k=cur===6?gd:rec;
+  if(cur===4||cur===6){k.ps=Math.min(VW*.94/540,VH*.97/510,2.6);k.px=600-REC_XS[sub]*k.ps;k.py=360}
   else{rec.ps=.34;rec.px=600-1090*.34;rec.py=360}
 }
 function goStage(i,keep,s){
@@ -1102,12 +1336,13 @@ function goStage(i,keep,s){
   if(i===1){lrn.t=0;lrn.sel=null;lrn.autoAt=3.2;lrnRefresh()}
   if(i===3)hubRefresh();
   if(i===4)rec.T[sub]=0;
+  if(i===6)gd.T[sub]=0;
   if(i===-2)why.t=0;
   applyRecCam();
   buildCtl();
   try{history.replaceState(null,"","#"+HASHES[i+2])}catch(e){}
 }
-function goSub(j){sub=j;rec.T[j]=0;applyRecCam();setCaption();buildCtl()}
+function goSub(j){sub=j;(cur===6?gd:rec).T[j]=0;applyRecCam();setCaption();buildCtl()}
 function buildCtl(){
   const c=$("#ctl");let h="";
   const roles=(all,label)=>`<div class="chips" role="group" aria-label="Role">${label?`<span class="chip">${label}</span>`:""}`+(all?`<button class="chip" data-role="all" aria-pressed="${lrn.all}">All roles</button>`:"")+Object.keys(ROLEN).map(k=>`<button class="chip" data-role="${k}" aria-pressed="${k===ROLE&&!(all&&lrn.all)}"><i style="background:${ROLEC[k]}"></i>${ROLEN[k]}</button>`).join("")+`</div>`;
@@ -1119,11 +1354,15 @@ function buildCtl(){
   if(cur===2)h=`<div class="chips"><span class="chip"><i style="background:${PARTC.graph}"></i>Skills and how they relate</span><span class="chip"><i style="background:${PARTC.jobs}"></i>Jobs</span><span class="chip"><i style="background:${PARTC.cand}"></i>People</span><span class="chip"><i style="background:${PARTC.elig}"></i>Rules</span></div>`;
   if(cur===3){
     const u=UCS[hub.sel];
-    h=`<div class="chips"><span class="chip" style="border-color:var(--accent)">${esc(u[0])}</span><span class="chip">Searches</span>`+u[3].map(k=>`<span class="chip"><i style="background:${PARTC[k]}"></i>${PARTN[k]}</span>`).join("")+`</div><div class="chips">`+(hub.sel===0?`<button class="chip primary" data-open="rec">See how it works →</button>`:`<span class="chip">Step-by-step breakdown coming next</span>`)+`</div>`;
+    h=`<div class="chips"><span class="chip" style="border-color:var(--accent)">${esc(u[0])}</span><span class="chip">Searches</span>`+u[3].map(k=>`<span class="chip"><i style="background:${PARTC[k]}"></i>${PARTN[k]}</span>`).join("")+`</div><div class="chips">`+(hub.sel===0?`<button class="chip primary" data-open="rec">See how it works →</button>`:hub.sel===3?`<button class="chip primary" data-open="guide">See how it works →</button>`:`<span class="chip">Step-by-step breakdown coming next</span>`)+`</div>`;
   }
   if(cur===4){
     h=`<div class="chips" role="group" aria-label="Step">`+["Read job","Widen","Find people","Check","Rank"].map((n,i)=>`<button class="chip" data-sub="${i}" aria-pressed="${i===sub}">${i+1} ${n}</button>`).join("")+`</div>`+roles(false,"Open workflow for")+
       `<div class="chips">`+(sub>=1&&sub<=4?`<button class="chip" id="adjBtn" aria-pressed="${REC.adj}">Use related skills</button>`:"")+(sub===4?`<button class="chip" id="decayBtn" aria-pressed="${REC.decay}">Recent counts more</button><span class="chip"><i class="sq" style="background:${EVC.V}"></i>Proven in interview</span><span class="chip"><i class="sq" style="background:${EVC.D}"></i>Shown in assessment</span><span class="chip"><i class="sq hol" style="color:#8CA39E"></i>Stated on résumé</span><span class="chip"><i class="sq hol" style="color:#6CD0F5"></i>Related skill</span>`:"")+(sub===2?`<span class="chip"><i style="background:${EVC.V}"></i>Proven</span><span class="chip"><i style="background:${EVC.D}"></i>Shown</span><span class="chip"><i class="hol" style="color:#8CA39E"></i>Stated</span><span class="chip"><i class="hol" style="color:#6CD0F5"></i>Related</span><span class="chip"><i style="background:#2A3B57"></i>None</span>`:"")+`</div>`;
+  }
+  if(cur===6){
+    h=`<div class="chips" role="group" aria-label="Step">`+["Open","Proven?","Pick","Write","Interview"].map((n,i)=>`<button class="chip" data-sub="${i}" aria-pressed="${i===sub}">${i+1} ${n}</button>`).join("")+`</div>`+roles(false,"Interview for")+(sub>=1&&sub<=3?`<div class="chips"><button class="chip" id="adjBtn" aria-pressed="${REC.adj}">Use related skills</button></div>`:"");
+    if(sub===1)h+=`<div class="chips"><span class="chip"><i style="background:${EVC.V}"></i>Proven</span><span class="chip"><i style="background:${EVC.D}"></i>Shown</span><span class="chip"><i class="hol" style="color:#8CA39E"></i>Stated</span><span class="chip"><i class="hol" style="color:#6CD0F5"></i>Related</span><span class="chip"><i style="background:#2A3B57"></i>None</span></div>`;
   }
   if(cur===5)h=`<div class="chips"><button class="chip" data-restart="1">Replay from the start</button></div>`;
   c.innerHTML=h;layoutStage();
@@ -1134,19 +1373,20 @@ $("#ctl").addEventListener("click",e=>{
     if(r.dataset.role==="all")lrn.all=true;else{ROLE=r.dataset.role;lrn.all=false}
     if(cur===1){lrn.sel=null;lrn.autoAt=lrn.t+1.8;lrnRefresh()}
     if(cur===4){recBuild();applyRecCam();rec.T[sub]=0;setStory()}
+    if(cur===6){gdBuild();applyRecCam();gd.T[sub]=0;setStory()}
     buildCtl();return;
   }
   const sb=e.target.closest("[data-sub]");if(sb){goSub(+sb.dataset.sub);return}
-  if(e.target.closest("[data-open]")){goStage(4,false,0);return}
+  {const o=e.target.closest("[data-open]");if(o){goStage(o.dataset.open==="guide"?6:4,false,0);return}}
   if(e.target.closest("[data-next]")){step(1);return}
   if(e.target.closest("[data-restart]")){goStage(-2);return}
-  if(e.target.closest("#adjBtn")){REC.adj=!REC.adj;recBuild();applyRecCam();setStory();buildCtl();return}
+  if(e.target.closest("#adjBtn")){REC.adj=!REC.adj;recBuild();gdBuild();applyRecCam();setStory();buildCtl();return}
   if(e.target.closest("#decayBtn")){REC.decay=!REC.decay;recBuild();applyRecCam();rec.T[4]=0;setStory();buildCtl()}
 });
 (function(){
   const s=$("#steps");
   s.innerHTML=`<button class="stp arr" data-d="-1" aria-label="Previous">‹</button><button class="stp" data-i="-2">Why</button><button class="stp" data-i="-1">Overview</button><span class="grp">Build once</span>`+
-    ["Match","Learn","Save"].map((n,i)=>`<button class="stp" data-i="${i}"><i>${i+1}</i>${n}</button>`).join("")+`<span class="grp">Use</span><button class="stp" data-i="3">Use cases</button><button class="stp" data-i="4">Recommendation</button><span class="grp"></span><button class="stp" data-i="5">Summary</button><button class="stp arr" data-d="1" aria-label="Next">›</button>`;
+    ["Match","Learn","Save"].map((n,i)=>`<button class="stp" data-i="${i}"><i>${i+1}</i>${n}</button>`).join("")+`<span class="grp">Use</span><button class="stp" data-i="3">Use cases</button><button class="stp" data-i="4">Recommendation</button><button class="stp" data-i="6">Interview guides</button><span class="grp"></span><button class="stp" data-i="5">Summary</button><button class="stp arr" data-d="1" aria-label="Next">›</button>`;
   s.addEventListener("click",e=>{
     const b=e.target.closest(".stp");if(!b)return;
     if(b.dataset.d){step(+b.dataset.d)}else goStage(+b.dataset.i);
@@ -1193,18 +1433,19 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(layoutStage);
 let last=performance.now();
 function frame(now){
   const dt=Math.max(0,Math.min(.05,(now-last)/1000));last=now;
-  matchUpdate(dt);lrnUpdate(dt);savUpdate(dt);hubUpdate(dt);recUpdate(dt);ovUpdate(dt);whyUpdate(dt);
+  matchUpdate(dt);lrnUpdate(dt);savUpdate(dt);hubUpdate(dt);recUpdate(dt);gdUpdate(dt);ovUpdate(dt);whyUpdate(dt);
   requestAnimationFrame(frame);
 }
 
 /* ---------- boot ---------- */
 resize();
-recBuild();lrnRefresh();hubRefresh();
+recBuild();gdBuild();lrnRefresh();hubRefresh();
 rec.tx=600-1090*.34;rec.ty=360;rec.s=.34;rec.px=rec.tx;rec.py=rec.ty;rec.ps=.34;
 const h0=(location.hash||"").replace("#","").toLowerCase();
 const start=HASHES.indexOf(h0)-2;
 goStage(start>=-2&&h0?start:-2,false,0);
 if(cur===4){rec.tx=rec.px;rec.ty=rec.py;rec.s=rec.ps}
+if(cur===6){gd.tx=gd.px;gd.ty=gd.py;gd.s=gd.ps}
 requestAnimationFrame(frame);
 addEventListener("hashchange",()=>{const i=HASHES.indexOf((location.hash||"").replace("#","").toLowerCase())-2;if(i>=-2&&i!==cur)goStage(i,false,0)});
 })();
