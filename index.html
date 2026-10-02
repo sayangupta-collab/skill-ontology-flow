@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Skill Ontology Flow 2D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Concept: one flat SVG canvas, stages cross-fade, the recommendation pipeline pans along a wide strip. */
+:root{
+  color-scheme:dark;
+  --bg:#070D18; --glass:rgba(14,24,41,.78); --line:rgba(140,170,210,.22); --ink:#EAF1F8; --ink2:#9DB1CB;
+  --accent:#6CD0F5; --amber:#F0A04F; --red:#FF6B5E;
+  --f-display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 var(--f-body);overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#bg{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 45%,#0d1a2f 0%,#070D18 70%)}
+#stage{position:fixed;left:0;top:0;width:100%;height:100%;user-select:none;-webkit-user-select:none}
+#stage text{pointer-events:none}
+.stg{transition:opacity .4s}
+.hud{position:fixed;z-index:5;pointer-events:none}
+.hud>*{pointer-events:auto}
+.top{left:0;right:0;top:env(safe-area-inset-top,0px);display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px clamp(16px,3vw,28px)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand b{font:700 18px/1 var(--f-display);letter-spacing:-.01em}
+.samp{font:500 10.5px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);border:1px dashed var(--line);border-radius:99px;padding:5px 8px}
+.tools{display:flex;gap:8px}
+.btn{background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-weight:500;font-size:13px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:border-color .15s}
+.btn:hover{border-color:var(--accent)}
+.btn[aria-pressed="true"]{background:var(--accent);color:#06121C;border-color:var(--accent)}
+.cap{left:clamp(16px,3vw,28px);right:clamp(16px,3vw,28px);top:calc(env(safe-area-inset-top,0px) + 64px);pointer-events:none;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.cap-l{min-width:0}
+.story{flex:0 0 min(360px,40vw);background:var(--glass);border:1px solid var(--line);border-radius:12px;padding:10px 13px;display:grid;gap:7px;font-size:12.5px;line-height:1.38;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.story:empty{display:none}
+.story .r{display:grid;grid-template-columns:42px minmax(0,1fr);gap:8px}
+.story .k{font:600 10px/1.9 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.story .k.w{color:var(--amber)}
+.story .v{color:var(--ink)}
+.cap h1{margin:0;font:700 clamp(24px,min(4vw,6.2vh),46px)/1.05 var(--f-display);letter-spacing:-.025em;text-wrap:balance;max-width:24ch;text-shadow:0 2px 24px rgba(7,13,24,.9)}
+.cap p{margin:8px 0 0;font:500 13px var(--f-mono);letter-spacing:.04em;color:var(--accent);text-transform:uppercase;text-shadow:0 2px 12px rgba(7,13,24,.9)}
+.ctl{left:clamp(16px,3vw,28px);right:clamp(16px,3vw,28px);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);display:flex;gap:10px;flex-wrap:wrap;align-items:center;pointer-events:none}
+.ctl>*{pointer-events:auto}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--glass);border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:13px;font-weight:500;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:inline-flex;align-items:center;gap:7px}
+button.chip[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chip i.sq{border-radius:2px}
+.chip i.hol{background:transparent!important;border:2px dashed currentColor}
+.steps{left:0;right:0;bottom:env(safe-area-inset-bottom,0px);display:flex;justify-content:center;padding:14px clamp(12px,3vw,28px);pointer-events:none}
+.steps>div{pointer-events:auto;display:flex;gap:4px;align-items:center;background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:5px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);max-width:100%;overflow-x:auto;scrollbar-width:none}
+.steps>div::-webkit-scrollbar{display:none}
+.stp{background:none;border:0;border-radius:10px;padding:8px 12px;font-weight:500;font-size:13px;color:var(--ink2);white-space:nowrap;display:flex;gap:7px;align-items:center}
+.stp:hover{color:var(--ink)}
+.stp[aria-current="step"]{background:var(--accent);color:#06121C}
+.stp i{font:600 10.5px/1 var(--f-mono);font-style:normal;opacity:.75}
+.arr{padding:8px 10px}
+#tip{position:fixed;z-index:9;pointer-events:none;background:rgba(7,13,24,.95);border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:13px;max-width:260px;display:none}
+#tip b{display:block;font-weight:600}
+#tip span{color:var(--ink2);font-size:12.5px}
+.grp{font:600 9.5px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);padding:0 8px 0 10px;border-left:1px solid var(--line);margin-left:4px;white-space:nowrap}
+.chip.primary{background:var(--accent);color:#06121C;border-color:var(--accent)}
+@media (max-width:760px){.cap{flex-direction:column;gap:10px}.story{flex:none;width:100%}}
+@media (max-width:640px){.stp i{display:none}.cap h1{max-width:14ch}.btn{padding:7px 10px}}
+</style>
+</head>
+<body>
+
+<div id="bg"></div>
+<svg id="stage" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Skill ontology flow"></svg>
+
+<header class="hud top">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><line x1="6" y1="19" x2="13" y2="6" stroke="#EAF1F8" stroke-width="1.6"/><line x1="13" y1="6" x2="21" y2="18" stroke="#EAF1F8" stroke-width="1.6"/><line x1="6" y1="19" x2="21" y2="18" stroke="#EAF1F8" stroke-width="1.6" stroke-dasharray="3 3"/><circle cx="6" cy="19" r="4" fill="#46C8B6"/><circle cx="13" cy="6" r="4.5" fill="#6F9BFF"/><circle cx="21" cy="18" r="3.6" fill="#F0A04F"/></svg>
+    <b>Skill Ontology</b><span class="samp">Sample data · 2D</span>
+  </div>
+  <div class="tools">
+    <button class="btn" id="tour" aria-pressed="false">Auto tour</button>
+    <button class="btn" id="reset">Reset view</button>
+    <button class="btn" id="fs">Present</button>
+  </div>
+</header>
+<section class="hud cap" id="capwrap" aria-live="polite"><div class="cap-l"><h1 id="cap"></h1><p id="hint"></p></div><div class="story" id="story"></div></section>
+<div class="hud ctl" id="ctl"></div>
+<nav class="hud steps"><div id="steps"></div></nav>
+<div id="tip"></div>
+
+<script>
+(function(){
+"use strict";
+const DOM={be:{n:"Backend and APIs",c:"--d-be"},da:{n:"Data and analytics",c:"--d-da"},cl:{n:"Cloud and DevOps",c:"--d-cl"},fe:{n:"Frontend",c:"--d-fe"},bh:{n:"Customer and behavioural",c:"--d-bh"}};
+const VOL={tool:{n:"Fast-moving tool",c:"--d-da"},tech:{n:"Core technical",c:"--d-be"},dur:{n:"Durable behavioural",c:"--d-fe"}};
+const HALF={tool:18,tech:48,dur:120};
+const RAW=[
+["python","Python","be","tech","python3:n|Python 3:n|py:l","2023-02","2026-09",64],
+["java","Java","be","tech","Java 8:n|core java:l","2023-02","2026-08",31],
+["node","Node.js","be","tool","NodeJS:n|Node JS:n|node:l","2023-05","2026-07",22],
+["rest","REST API Design","be","tech","REST:n|RESTful APIs:n|REST APIs:n","2023-02","2026-09",58],
+["micro","Microservices","be","tech","micro-services:n|service-oriented architecture:l","2023-03","2026-09",41],
+["kafka","Kafka","be","tool","Apache Kafka:n|kafka streams:l","2023-09","2026-08",19],
+["sysdes","System Design","be","tech","architecture design:l|HLD:l|high-level design:l","2023-02","2026-09",47],
+["redis","Redis","be","tool","redis cache:n","2024-01","2026-06",14],
+["sql","SQL","da","tech","T-SQL:l|SQL queries:n|structured query language:n","2023-02","2026-09",72],
+["pg","PostgreSQL","da","tool","Postgres:n|psql:l|PG:l","2023-04","2026-09",33],
+["rdb","Relational Databases","da","tech","RDBMS:n","2023-06","2026-05",12],
+["model","Data Modelling","da","tech","data modeling:n|schema design:l","2023-05","2026-08",27],
+["etl","ETL","da","tech","data pipelines:l|ELT:l","2023-08","2026-04",18],
+["tableau","Tableau","da","tool","Tableau Desktop:n|Tableau dashboards:l","2023-03","2026-08",21],
+["powerbi","Power BI","da","tool","PowerBI:n|MS Power BI:n","2023-03","2026-09",24],
+["excel","Excel","da","tool","MS Excel:n|Microsoft Excel:n|spreadsheets:l","2023-02","2026-09",44],
+["stats","Statistics","da","tech","stats:n|statistical analysis:n","2023-04","2026-08",29],
+["ab","A/B Testing","da","tech","experimentation:l|split testing:l","2024-02","2026-07",16],
+["viz","Data Visualization","da","tech","dataviz:n|data visualisation:n","2023-03","2026-09",26],
+["cloudp","Cloud Platforms","cl","tech","public cloud:l","2023-04","2026-08",20],
+["aws","AWS","cl","tool","Amazon Web Services:n|AWS cloud:n","2023-02","2026-09",36],
+["docker","Docker","cl","tool","docker containers:n|Dockerfile:l","2023-02","2026-09",30],
+["k8s","Kubernetes","cl","tool","k8s:n|kube:l","2023-06","2026-09",25],
+["cicd","CI/CD","cl","tool","CICD:n|continuous integration:l|Jenkins pipelines:l","2023-03","2026-08",28],
+["tf","Terraform","cl","tool","IaC:l|infrastructure as code:l","2024-03","2026-05",15],
+["react","React","fe","tool","React.js:n|ReactJS:n|React JS:n","2023-02","2026-09",40],
+["js","JavaScript","fe","tech","JS:n|ECMAScript:l|ES6:l","2023-02","2026-09",52],
+["ts","TypeScript","fe","tool","TS:n","2023-07","2026-09",26],
+["html","HTML/CSS","fe","tech","HTML5:n|CSS3:n|HTML and CSS:n","2023-02","2026-08",34],
+["a11y","Accessibility","fe","tech","a11y:n|WCAG:l|screen reader support:l","2024-01","2026-08",17],
+["perf","Web Performance","fe","tech","core web vitals:l|page speed:l","2024-02","2026-07",13],
+["gql","GraphQL","fe","tool","Graph QL:n|GQL:l","2024-04","2026-06",11],
+["comm","Communication","bh","dur","verbal communication:n|articulation:l","2023-02","2026-09",90],
+["stake","Stakeholder Management","bh","dur","stakeholder engagement:n","2023-03","2026-09",38],
+["prob","Problem Solving","bh","dur","analytical thinking:l|troubleshooting:l","2023-02","2026-09",84],
+["empathy","Customer Empathy","bh","dur","customer-first mindset:l","2023-05","2026-09",23],
+["conflict","Conflict Resolution","bh","dur","de-escalation:l","2023-08","2026-07",12],
+["acct","Account Planning","bh","dur","territory planning:l|QBR prep:l","2023-09","2026-08",14],
+["renew","Renewals and Churn","bh","dur","renewal management:n|retention:l|churn:l","2023-05","2026-09",22],
+["crm","CRM","bh","tool","Salesforce:l|SFDC:l","2023-04","2026-09",28]
+];
+const hash=s=>{let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h};
+const MNAME={e:"exact",n:"normalised",l:"LLM-judged"};
+const SK={};
+RAW.forEach(r=>{
+  SK[r[0]]={id:r[0],name:r[1],dom:r[2],vol:r[3],first:r[5],last:r[6],src:r[7],
+    aliases:r[4].split("|").filter(Boolean).map(a=>{const p=a.split(":");const m=p[1]||"e";const h=hash(p[0]);
+      return {t:p[0],m:MNAME[m],conf:m==="e"?1:m==="n"?0.96+(h%4)/100:0.78+(h%15)/100}})};
+});
+const REASON={c:"co-occurrence",s:"shared evaluations"};
+const EDG=[],NB={};
+Object.keys(SK).forEach(k=>NB[k]=[]);
+`B cloudp aws
+B viz tableau
+B viz powerbi
+B rdb pg
+B sysdes micro
+P sql model
+P sql etl
+P stats ab
+P js ts
+P js react
+P html a11y
+P docker k8s
+P rest micro
+P comm stake
+P empathy conflict
+R python etl .6 c
+R python stats .5 c
+R kafka micro .7 s
+R docker micro .55 s
+R k8s micro .5 s
+R aws tf .6 c
+R aws docker .55 c
+R aws k8s .5 c
+R cicd docker .5 s
+R cicd tf .4 c
+R react ts .75 s
+R react perf .5 c
+R react gql .45 c
+R a11y html .6 s
+R gql rest .6 s
+R node js .7 c
+R node rest .65 c
+R java micro .55 c
+R tableau powerbi .75 s
+R excel powerbi .5 c
+R excel tableau .4 c
+R sql pg .8 c
+R pg redis .4 c
+R model pg .5 c
+R sysdes kafka .5 s
+R sysdes redis .4 c
+R viz stats .4 c
+R perf js .5 c
+R stake renew .5 s
+R crm acct .6 c
+R acct renew .6 s
+R prob comm .4 s
+R empathy comm .55 s
+R conflict stake .45 s
+R sql excel .4 c
+R stake acct .4 s`.split("\n").forEach(l=>{
+  const p=l.trim().split(/\s+/);
+  const e={type:p[0],a:p[1],b:p[2],w:p[0]==="R"?+p[3]:1,reason:p[0]==="R"?REASON[p[4]]:null};
+  EDG.push(e);
+  NB[e.a].push({id:e.b,type:e.type,w:e.w,out:true,reason:e.reason});
+  NB[e.b].push({id:e.a,type:e.type,w:e.w,out:false,reason:e.reason});
+});
+
+const CLS={C:"Core",S:"Supplemental",N:"Non-relevant"};
+/* skill: [class, weight, inJD, interviews that evaluated it] */
+const ROLES={
+ be:{jd:"JD-014",title:"Senior Backend Engineer",short:"Backend",n:12,sk:{
+  python:["C",1,1,11],rest:["C",.9,1,10],sysdes:["C",1,0,11],micro:["C",.9,1,9],sql:["C",.8,1,8],prob:["C",.8,0,12],
+  pg:["S",.5,1,6],kafka:["S",.5,1,5],aws:["S",.5,1,5],docker:["S",.45,1,5],comm:["S",.4,1,7],k8s:["S",.35,1,2],
+  tf:["N",0,1,0],gql:["N",0,1,0]}},
+ fe:{jd:"JD-021",title:"Frontend Engineer",short:"Frontend",n:9,sk:{
+  react:["C",1,1,9],js:["C",.9,1,9],ts:["C",.9,1,8],html:["C",.7,1,7],a11y:["C",.7,1,6],perf:["C",.6,1,6],prob:["C",.7,0,9],comm:["C",.5,0,8],
+  gql:["S",.5,1,4],rest:["S",.4,1,3],node:["S",.3,1,2],cicd:["S",.3,1,2],
+  docker:["N",0,1,0]}},
+ da:{jd:"JD-027",title:"Data Analyst",short:"Data analyst",n:10,sk:{
+  sql:["C",1,1,10],excel:["C",.8,1,9],powerbi:["C",.8,1,8],stats:["C",.8,1,7],viz:["C",.7,1,8],comm:["C",.6,1,8],prob:["C",.6,0,9],
+  python:["S",.6,1,5],stake:["S",.5,1,5],tableau:["S",.4,1,3],ab:["S",.4,1,3],model:["S",.4,0,3],
+  etl:["N",0,1,0]}},
+ csm:{jd:"JD-040",title:"Customer Success Manager",short:"Customer success",n:11,sk:{
+  comm:["C",1,1,11],stake:["C",.9,1,10],renew:["C",.9,1,9],empathy:["C",.8,1,9],acct:["C",.7,0,7],
+  conflict:["S",.5,1,5],crm:["S",.5,1,6],prob:["S",.5,1,5],
+  excel:["N",0,1,0],viz:["N",0,1,0]}}
+};
+const RKEYS=Object.keys(ROLES);
+const bp=rk=>Object.entries(ROLES[rk].sk).map(([id,v])=>({id,cls:v[0],w:v[1],inJD:!!v[2],ev:v[3]}));
+
+const JDS=[
+ {id:"JD-014",title:"Senior Backend Engineer",role:"be"},
+ {id:"JD-009",title:"Backend Engineer",extra:["python","rest","sql","pg","docker","comm"]},
+ {id:"JD-021",title:"Frontend Engineer",role:"fe"},
+ {id:"JD-027",title:"Data Analyst",role:"da"},
+ {id:"JD-018",title:"Data Engineer",extra:["sql","etl","python","kafka","pg","aws"]},
+ {id:"JD-040",title:"Customer Success Manager",role:"csm"},
+ {id:"JD-043",title:"Account Executive",extra:["crm","prob","acct","comm"]}
+];
+const JD={};JDS.forEach(j=>JD[j.id]=j);
+const jdSkills=id=>JD[id].role?bp(JD[id].role).filter(x=>x.inJD).map(x=>x.id):JD[id].extra;
+
+/* transcripts: label, date, minutes, gist, skills heard, candidates [jd, title signal, conversation signal, title method] */
+const TRAW=[
+ ["T-1001","Sr. Backend Dev – Round 2","2026-08-12",52,"Owned an order service end to end: REST, Postgres, Kafka, Kubernetes deployments.",["python","rest","sysdes","pg","kafka","docker","prob"],[["JD-014",.93,.91,"normalised"],["JD-009",.71,.78,"LLM-judged"]]],
+ ["T-1002","Senior Backend Engineer – Tech","2026-08-19",58,"Microservice decomposition, cloud deployment and a system design discussion.",["python","micro","rest","sql","aws","k8s","prob"],[["JD-014",1,.88,"exact"],["JD-009",.8,.8,"LLM-judged"]]],
+ ["T-1003","Backend Engineer II","2026-08-26",47,"Mid-level backend questions. Strong on APIs and SQL, lighter on system design.",["python","sql","rest","docker","comm"],[["JD-014",.74,.84,"LLM-judged"],["JD-009",.82,.7,"normalised"]]],
+ ["T-1004","Software Engineer","2026-09-02",55,"Generic title in the ATS. The conversation is about Kafka, Postgres and service design.",["python","sysdes","micro","pg","kafka","prob"],[["JD-009",.55,.9,"LLM-judged"],["JD-014",.55,.88,"LLM-judged"],["JD-021",.5,.22,"LLM-judged"]]],
+ ["T-1005","Backend Engineer – Platform","2026-09-08",44,"Platform team interview: APIs, containers and on-call practice.",["python","rest","sql","docker","comm"],[["JD-009",.96,.92,"normalised"],["JD-014",.78,.82,"LLM-judged"]]],
+ ["T-1006","Front-end Dev (React)","2026-08-14",49,"Component library, a TypeScript migration and accessibility checks in CI.",["react","js","ts","html","a11y","perf","comm"],[["JD-021",.9,.93,"normalised"],["JD-014",.3,.2,"LLM-judged"]]],
+ ["T-1007","UI Engineer","2026-08-28",41,"Interface-focused role: React, HTML and accessibility, little on build tooling.",["react","js","html","a11y","comm"],[["JD-021",.62,.9,"LLM-judged"],["JD-009",.28,.25,"LLM-judged"]]],
+ ["T-1008","Frontend Engineer – Round 1","2026-09-04",46,"React performance, GraphQL data fetching and code review habits.",["react","ts","js","perf","gql","prob"],[["JD-021",1,.9,"exact"],["JD-009",.35,.28,"LLM-judged"]]],
+ ["T-1009","Data Analyst – Technical","2026-08-10",53,"SQL exercises, Excel modelling and Power BI dashboards.",["sql","excel","powerbi","stats","viz","comm"],[["JD-027",1,.92,"exact"],["JD-018",.45,.52,"LLM-judged"]]],
+ ["T-1010","BI Analyst Interview","2026-09-01",38,"Dashboards and reporting in Power BI and Tableau, SQL for extracts.",["sql","powerbi","tableau","viz","stake"],[["JD-027",.66,.88,"LLM-judged"],["JD-018",.3,.35,"LLM-judged"]]],
+ ["T-1011","Customer Success Manager","2026-09-05",50,"The interviewer asks about quota attainment and pipeline coverage. Renewals and onboarding never come up.",["crm","acct","prob"],[["JD-040",1,.22,"exact"],["JD-043",.25,.7,"LLM-judged"]]],
+ ["T-1012","Customer Success Manager – Panel","2026-08-21",57,"Account portfolio, renewals and escalation handling.",["comm","stake","renew","empathy","crm"],[["JD-040",1,.94,"exact"],["JD-043",.3,.4,"LLM-judged"]]],
+ ["T-1013","CSM (Enterprise)","2026-08-30",48,"Enterprise accounts, executive sponsors and QBR preparation.",["stake","renew","comm","conflict","acct"],[["JD-040",.88,.9,"normalised"],["JD-043",.35,.45,"LLM-judged"]]],
+ ["T-1014","Customer Success Lead","2026-09-07",45,"Lead-level conversation about renewals, coaching and customer empathy.",["comm","empathy","renew","stake"],[["JD-040",.72,.89,"LLM-judged"],["JD-043",.3,.3,"LLM-judged"]]]
+];
+const W_T=.4,W_C=.6,AUTO=.85,REV=.6;
+const TR=TRAW.map(r=>({id:r[0],label:r[1],date:r[2],min:r[3],gist:r[4],heard:r[5],
+  c:r[6].map(c=>({jd:c[0],ts:c[1],cs:c[2],m:c[3],sc:W_T*c[1]+W_C*c[2]})).sort((a,b)=>b.sc-a.sc)}));
+const SL={auto:"Auto-tagged",review:"Needs review",held:"Held out",reviewed:"Confirmed",excluded:"Excluded"};
+const TAG={sel:"T-1003",assign:{}};
+function tstatus(t){
+  const a=TAG.assign[t.id];
+  if(a==="x")return {k:"excluded",jd:null};
+  if(a)return {k:"reviewed",jd:a};
+  const top=t.c[0];
+  if(top.sc>=AUTO)return {k:"auto",jd:top.jd};
+  if(top.sc>=REV)return {k:"review",jd:null,sugg:top.jd};
+  return {k:"held",jd:null,sugg:top.jd};
+}
+
+/* extract excerpts. {{surface|skill}} marks a mention */
+const EXC={
+ be:{tid:"T-1001",turns:[
+  ["Interviewer","Walk me through the last service you owned end to end."],
+  ["Candidate","It was an order service. We exposed {{RESTful APIs|rest}}, kept state in {{Postgres|pg}}, and published events to {{Apache Kafka|kafka}} for the other {{micro-services|micro}}. Earlier it was one big monolith, so I split it into {{microservices|micro}}."],
+  ["Interviewer","How did you decide on that design?"],
+  ["Candidate","I drew the {{HLD|sysdes}} first, then load-tested it. Everything ran in {{Docker containers|docker}} on {{k8s|k8s}}, and when latency spiked I did the {{troubleshooting|prob}} from traces."],
+  ["Interviewer","And day to day?"],
+  ["Candidate","Mostly {{Python 3|python}}. The schema is in {{PostgreSQL|pg}} and I write the {{SQL queries|sql}} myself. I keep {{communication|comm}} short and use one diagram."]]},
+ fe:{tid:"T-1006",turns:[
+  ["Interviewer","What does your stack look like right now?"],
+  ["Candidate","Most of my work is {{React.js|react}} with {{TS|ts}}. We started in plain {{JavaScript|js}} and moved over gradually."],
+  ["Interviewer","Tell me about the component library."],
+  ["Candidate","It is built in {{ReactJS|react}}. We added {{a11y|a11y}} checks in CI because {{WCAG|a11y}} AA was a hard requirement, and we watch {{core web vitals|perf}} on every release."],
+  ["Interviewer","How do you work with designers?"],
+  ["Candidate","I own the {{HTML5|html}} and {{CSS3|html}} for the design tokens, and I keep {{communication|comm}} with design weekly. Honestly {{React|react}} is the easy part."]]},
+ da:{tid:"T-1009",turns:[
+  ["Interviewer","What do you use most?"],
+  ["Candidate","I live in {{SQL|sql}} and {{MS Excel|excel}} day to day. The dashboards are in {{PowerBI|powerbi}}."],
+  ["Interviewer","Give me a recent example."],
+  ["Candidate","For the churn report I used {{stats|stats}} to check the lift was real, then built the view in {{Power BI|powerbi}}. Good {{dataviz|viz}} matters more than the model."],
+  ["Interviewer","Other tools?"],
+  ["Candidate","I used {{Tableau Desktop|tableau}} at my last job. Smaller teams get by on {{spreadsheets|excel}}, but I wanted proper {{statistical analysis|stats}} too."]]},
+ csm:{tid:"T-1012",turns:[
+  ["Interviewer","Tell me about your portfolio."],
+  ["Candidate","I owned about forty accounts. {{Renewal management|renew}} was the main goal, and when {{churn|renew}} risk showed up I called the sponsor early."],
+  ["Interviewer","How do you track it?"],
+  ["Candidate","Everything is logged in {{Salesforce|crm}}. The {{SFDC|crm}} notes fed my {{QBR prep|acct}}."],
+  ["Interviewer","A hard moment?"],
+  ["Candidate","A customer threatened to leave. I used {{de-escalation|conflict}} and listened first, a real {{customer-first mindset|empathy}}, then brought in our exec for {{stakeholder engagement|stake}}."]]}
+};
+
+/* candidate pool. evidence: [skill, level V/D/C, YYYY-MM] */
+const POOL=[
+ {id:"C-2041",note:"Backend lead, 7 years",flag:"Proctoring flag under review",ev:[["python","V","2026-03"],["sysdes","V","2026-03"],["rest","V","2026-03"],["prob","V","2026-03"],["sql","V","2026-03"],["micro","D","2026-02"],["pg","V","2026-03"],["kafka","D","2025-12"],["docker","D","2026-01"],["aws","C","2025-06"],["comm","V","2026-03"]]},
+ {id:"C-2057",note:"Backend engineer, 4 years",ev:[["python","D","2026-02"],["rest","D","2026-02"],["sql","D","2026-02"],["microservices-placeholder","C","2024-06"],["aws","C","2025-03"],["java","C","2024-01"]]},
+ {id:"C-2063",note:"Full-stack engineer",ev:[["js","V","2026-05"],["react","V","2026-05"],["ts","D","2026-04"],["node","D","2026-04"],["rest","D","2026-04"],["sql","C","2025-08"],["python","C","2025-08"],["comm","V","2026-05"]]},
+ {id:"C-2072",note:"Senior frontend engineer",gate:{type:"Cool-off",text:"Cool-off period ends 14 Dec 2026"},ev:[["react","V","2026-07"],["ts","V","2026-07"],["js","V","2026-07"],["html","D","2026-06"],["a11y","D","2026-06"],["perf","C","2025-09"],["comm","V","2026-07"],["prob","V","2026-07"]]},
+ {id:"C-2088",note:"Frontend engineer, 2 years",gate:{type:"Consent",text:"Consent withdrawn on 3 Sep 2026"},ev:[["react","C","2025-04"],["js","D","2026-01"],["html","D","2026-01"],["ts","C","2025-04"]]},
+ {id:"C-2095",note:"Data analyst, 5 years",ev:[["sql","V","2026-04"],["excel","V","2026-04"],["powerbi","V","2026-04"],["stats","D","2026-03"],["viz","D","2026-03"],["comm","V","2026-04"],["python","C","2025-10"]]},
+ {id:"C-2101",note:"BI analyst, 6 years",gate:{type:"Blacklist",text:"Blacklist entry, owner TA Ops, review due 1 Feb 2027"},ev:[["tableau","V","2025-09"],["sql","D","2026-01"],["stats","V","2025-09"],["excel","D","2026-01"],["viz","V","2025-09"],["stake","C","2025-02"]]},
+ {id:"C-2110",note:"Data engineer, 5 years",ev:[["python","V","2026-02"],["sql","V","2026-02"],["etl","D","2026-01"],["pg","D","2026-01"],["model","D","2026-01"],["kafka","C","2025-05"],["aws","C","2025-05"]]},
+ {id:"C-2123",note:"Customer success manager, 6 years",ev:[["comm","V","2026-06"],["stake","V","2026-06"],["renew","V","2026-06"],["empathy","V","2026-06"],["acct","D","2026-05"],["crm","C","2025-11"],["conflict","D","2026-05"]]},
+ {id:"C-2130",note:"Junior customer success associate",gate:{type:"Retention",text:"Retention period expired on 30 Aug 2026"},ev:[["comm","D","2025-12"],["empathy","C","2025-06"],["renew","C","2025-06"],["crm","C","2025-06"]]}
+];
+POOL.forEach(c=>{c.ev=c.ev.map(e=>e[0]==="microservices-placeholder"?["micro",e[1],e[2]]:e)});
+const EVL={V:{n:"Validated",src:"Structured interview scorecard",m:1},D:{n:"Demonstrated",src:"Talview screening or assessment",m:.7},C:{n:"Claimed",src:"Résumé or profile",m:.4}};
+const EV={mult:{V:1,D:.7,C:.4},decay:true,adj:true};
+const REF=[2026,10];
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const REDUCED=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+const NS="http://www.w3.org/2000/svg";
+const DOMC={be:"#6F9BFF",da:"#F0A04F",cl:"#A28CFF",fe:"#46C8B6",bh:"#F27AA6"};
+const ROLEC={be:"#6F9BFF",fe:"#46C8B6",da:"#F0A04F",csm:"#F27AA6",ae:"#8392A8"};
+const ROLEN={be:"Backend",fe:"Frontend",da:"Data",csm:"Customer success"};
+const EVC={V:"#3DC9AE",D:"#2E8F82",C:"#8CA39E",A:"#6CD0F5"};
+const PARTC={graph:"#6CD0F5",jobs:"#F0A04F",cand:"#3DC9AE",eval:"#A28CFF",integ:"#F27AA6",elig:"#FF6B5E"};
+const PARTN={graph:"Skill graph",jobs:"Jobs and skills",cand:"People and evidence",eval:"Interview results",integ:"Identity checks",elig:"Eligibility"};
+const PARTT={graph:"Every skill once, with its other names and how skills relate.",jobs:"Each job with its must-have, nice-to-have and not-needed skills.",cand:"Each person's skills and the evidence behind them.",eval:"Stages reached and scorecards from interviews.",integ:"Identity and proctoring checks.",elig:"Consent, blacklist, cool-off and retention dates."};
+const SLABK=["jobs","cand","eval","integ","elig"];
+const FONT='"IBM Plex Sans",system-ui,sans-serif',MONO='"IBM Plex Mono",ui-monospace,monospace';
+const clamp01=x=>Math.max(0,Math.min(1,x));
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const easeOut=t=>1-Math.pow(1-t,3);
+const lerp=(a,b,t)=>a+(b-a)*t;
+const PNAME={"C-2041":"Marcus Reid","C-2057":"Priya Nair","C-2063":"Diego Alvarez","C-2072":"Hannah Weiss","C-2088":"Tomas Novak","C-2095":"Aisha Khan","C-2101":"Liam O'Connor","C-2110":"Sofia Marino","C-2123":"Kwame Mensah","C-2130":"Elena Petrova"};
+POOL.forEach(c=>{c.name=PNAME[c.id];c.first=c.name.split(" ")[0]});
+const TNAME={"T-1001":"Marcus Reid","T-1003":"Priya Nair","T-1006":"Hannah Weiss","T-1007":"Diego Alvarez","T-1009":"Aisha Khan","T-1010":"Liam O'Connor","T-1012":"Kwame Mensah","T-1014":"Elena Petrova","T-1002":"Noah Fischer","T-1011":"Rahul Verma"};
+const MLABEL={"T-1001":"Sr. Backend Dev","T-1003":"Backend Engineer II","T-1006":"Front-end Dev (React)","T-1007":"UI Engineer","T-1009":"Data Analyst","T-1010":"BI Analyst","T-1012":"CSM, panel round","T-1014":"Customer Success Lead","T-1002":"Senior Backend Eng.","T-1011":"Customer Success Mgr."};
+let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+
+function S(tag,a,p){const e=document.createElementNS(NS,tag);if(a)for(const k in a){if(k==="text")e.textContent=a[k];else e.setAttribute(k,a[k])}if(p)p.appendChild(e);return e}
+function T(p,x,y,str,o){o=o||{};return S("text",{x,y,text:str,fill:o.fill||"#EAF1F8","font-size":o.size||14,"font-weight":o.w||500,"text-anchor":o.anchor||"middle","font-family":o.mono?MONO:FONT,"dominant-baseline":"central",opacity:o.op==null?1:o.op},p)}
+function tip(e,title,text){e.setAttribute("data-tip",title+"|"+(text||""))}
+function bez(a,c,b,t){const u=1-t;return {x:u*u*a.x+2*u*t*c.x+t*t*b.x,y:u*u*a.y+2*u*t*c.y+t*t*b.y}}
+function tf(g,x,y,s){g.setAttribute("transform",`translate(${x.toFixed(1)} ${y.toFixed(1)})${s!=null&&s!==1?` scale(${s.toFixed(3)})`:""}`)}
+
+const svg=$("#stage");
+const defs=S("defs",null,svg);
+S("filter",{id:"glw",x:"-50%",y:"-50%",width:"200%",height:"200%"},defs).innerHTML='<feGaussianBlur stdDeviation="4"/>';
+const gs=[];
+for(let i=0;i<8;i++){const g=S("g",{class:"stg",opacity:0,"pointer-events":"none"},svg);gs.push(g)}
+/* gs[0..4] = Match, Learn, Save, Use cases, Recommendation; gs[5] = overview; gs[6] = why; gs[7] = summary */
+
+/* ---------- tooltips ---------- */
+const tipEl=$("#tip");let pinnedT=0;
+function showTipFor(t,x,y){
+  const el=t&&t.closest?t.closest("[data-tip]"):null;
+  if(!el){if(performance.now()>pinnedT)tipEl.style.display="none";return false}
+  const [a,b]=el.getAttribute("data-tip").split("|");
+  tipEl.innerHTML=`<b>${esc(a)}</b>${b?`<span>${esc(b)}</span>`:""}`;tipEl.style.display="block";
+  tipEl.style.left=Math.min(x+16,innerWidth-280)+"px";tipEl.style.top=Math.min(y+16,innerHeight-90)+"px";return true;
+}
+svg.addEventListener("pointermove",e=>showTipFor(e.target,e.clientX,e.clientY));
+svg.addEventListener("pointerleave",()=>{tipEl.style.display="none"});
+svg.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("[data-tip]")&&!e.target.closest("[data-nopin]")){pinnedT=performance.now()+2600;showTipFor(e.target,e.clientX,e.clientY);setTimeout(()=>{if(performance.now()>=pinnedT)tipEl.style.display="none"},2700)}});
+
+/* ======================= STAGE 0: MATCH ======================= */
+const TAGS=[["T-1001","be","auto"],["T-1003","be","review"],["T-1006","fe","auto"],["T-1007","fe","review"],["T-1009","da","auto"],
+  ["T-1010","da","review"],["T-1012","csm","auto"],["T-1014","csm","review"],["T-1002","be","auto"],["T-1011","ae","held"]];
+const SLABS=[["be","Senior Backend Engineer"],["fe","Frontend Engineer"],["da","Data Analyst"],["csm","Customer Success Manager"],["ae","Account Executive"]];
+const STATC={auto:"#6CD0F5",review:"#F0A04F",held:"#FF6B5E"};
+const mt={g:gs[0],t:0,cards:[],slabs:[]};
+(function(){
+  const g=mt.g,counts=SLABS.map(()=>0),PEN={x:560,y:596};
+  S("rect",{x:557,y:150,width:6,height:420,rx:3,fill:"#6CD0F5",opacity:.28},g);
+  S("rect",{x:547,y:150,width:26,height:420,rx:13,fill:"#6CD0F5",opacity:.08,filter:"url(#glw)"},g);
+  S("ellipse",{cx:PEN.x,cy:PEN.y,rx:46,ry:13,fill:"none",stroke:"#FF6B5E",opacity:.7,"stroke-width":2},g);
+  T(g,200,112,"Interview recordings",{size:15,w:600,fill:"#9DB1CB"});
+  T(g,985,112,"Job descriptions",{size:15,w:600,fill:"#9DB1CB"});
+  SLABS.forEach((s,j)=>{
+    const y=190+j*86,r=S("rect",{x:860,y:y-24,width:250,height:48,rx:10,fill:ROLEC[s[0]]},g);
+    tip(r,s[1],s[0]==="ae"?"Not enough interviews yet":"Job description");
+    T(g,985,y,s[1],{size:15,w:600,fill:"#06121C"});
+    mt.slabs.push({r,flash:0,y});
+  });
+  const lines=S("g",null,g),cardsG=S("g",null,g);
+  TAGS.forEach((c,i)=>{
+    const j=SLABS.findIndex(s=>s[0]===c[1]),k=counts[j]++,col=i%2,row=Math.floor(i/2);
+    const q={x:105+col*172,y:190+row*86},Tp={x:895+k*62,y:mt.slabs[j].y-38},ctrl={x:560,y:(q.y+Tp.y)/2};
+    const end=c[2]==="held"?{x:560,y:430}:Tp;
+    const path=[];for(let u=0;u<=24;u++){const p=bez(q,ctrl,end,u/24);path.push((u?"L":"M")+p.x.toFixed(1)+" "+p.y.toFixed(1))}
+    S("path",{d:path.join(" "),fill:"none",stroke:ROLEC[c[1]],"stroke-opacity":.3,"stroke-width":1.5,"stroke-dasharray":c[2]==="auto"?"":"6 5"},lines);
+    const cg=S("g",{style:"cursor:"+(c[2]==="held"?"pointer":"default")},cardsG);
+    S("rect",{x:-76,y:-33,width:152,height:66,rx:10,fill:"#15253F",stroke:STATC[c[2]],"stroke-width":3},cg);
+    T(cg,-64,-12,TNAME[c[0]],{size:14.5,w:600,fill:"#EAF1F8",anchor:"start"});
+    T(cg,-64,9,MLABEL[c[0]],{size:11,fill:"#9DB1CB",anchor:"start"});
+    S("rect",{x:-64,y:21,width:80,height:4,rx:2,fill:"#2E4A70"},cg);
+    const ring=S("circle",{r:58,fill:"none",stroke:"#F0A04F","stroke-width":3,"stroke-dasharray":"10 7",visibility:"hidden"},cg);
+    tip(cg,TNAME[c[0]],"Interview label: "+MLABEL[c[0]]+". "+(c[2]==="auto"?"The job title and the conversation agree. Matched automatically.":c[2]==="review"?"Close call. A person confirms the job.":"Title and conversation disagree. Click to reassign."));
+    const cd={id:c[0],status:c[2],j,q,T:Tp,ctrl,g:cg,ring,delay:.5+i*.7,arrived:false,released:false,relT:0,PEN};
+    if(c[2]==="held")cg.addEventListener("click",ev=>{ev.stopPropagation();if(!cd.released){cd.released=true;cd.relT=mt.t}});
+    mt.cards.push(cd);tf(cg,q.x,q.y,1);
+  });
+})();
+function matchUpdate(dt){
+  mt.t+=dt;if(REDUCED)mt.t=60;
+  if(mt.t>22){mt.t=0;mt.cards.forEach(c=>{c.arrived=false;c.released=false})}
+  const t=mt.t;
+  mt.slabs.forEach(s=>{s.flash=Math.max(0,s.flash-dt*1.6);s.r.setAttribute("stroke",s.flash>0?"#fff":"none");s.r.setAttribute("stroke-width",String(1+s.flash*5));s.r.setAttribute("stroke-opacity",String(s.flash))});
+  mt.cards.forEach(cd=>{
+    const lt=t-cd.delay;let u=0,pos,pause=false;
+    if(lt<0){tf(cd.g,cd.q.x,cd.q.y,1);cd.ring.setAttribute("visibility","hidden");return}
+    if(cd.status==="auto"){u=ease(clamp01(lt/2.8));pos=bez(cd.q,cd.ctrl,cd.T,u)}
+    else if(cd.status==="review"){
+      if(lt<1.1)u=.35*ease(lt/1.1);else if(lt<3){u=.35;pause=true}else u=.35+.65*ease(clamp01((lt-3)/1.7));
+      pos=bez(cd.q,cd.ctrl,cd.T,u);
+    }else{
+      const gp=bez(cd.q,cd.ctrl,cd.T,.35);
+      if(!cd.released){
+        if(lt<1.1){u=.35*ease(lt/1.1);pos=bez(cd.q,cd.ctrl,cd.T,u)}
+        else{const d=ease(clamp01((lt-1.1)/1));pos={x:lerp(gp.x,cd.PEN.x,d),y:lerp(gp.y,cd.PEN.y-26,d)};pause=lt>2.1;u=.35}
+      }else{
+        const r=clamp01((t-cd.relT)/2.4);pos=r<1?bez({x:cd.PEN.x,y:cd.PEN.y-26},{x:600,y:480},cd.T,ease(r)):cd.T;u=r<1?.35+.65*ease(r):1;
+      }
+    }
+    const sc=1-.62*ease(clamp01((u-.72)/.28));
+    tf(cd.g,pos.x,pos.y,sc);
+    cd.ring.setAttribute("visibility",pause?"visible":"hidden");if(pause)cd.ring.setAttribute("stroke-dashoffset",String(-t*30));
+    if(u>=1&&!cd.arrived){cd.arrived=true;mt.slabs[cd.j].flash=1}
+  });
+}
+
+/* ======================= STAGE 1: LEARN ======================= */
+let ROLE="be";
+const lrn={g:gs[1],nodes:{},edges:[],pulses:[],sel:null,all:false,t:0,autoAt:0,aliasEls:[],aliasFor:null,aliasT:0};
+(function(){
+  const ids=Object.keys(SK),P={},V={};
+  const order=Object.keys(DOMC),anch={};
+  order.forEach((d,i)=>{const a=-Math.PI/2+i*2*Math.PI/5;anch[d]=[600+Math.cos(a)*400,360+Math.sin(a)*160]});
+  seed=11;
+  ids.forEach(id=>{const a=anch[SK[id].dom];P[id]=[a[0]+(rnd()-.5)*90,a[1]+(rnd()-.5)*70];V[id]=[0,0]});
+  let al=1;
+  for(let it=0;it<420;it++){
+    for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+      const a=P[ids[i]],b=P[ids[j]];let dx=a[0]-b[0],dy=a[1]-b[1],d2=dx*dx+dy*dy+.01;if(d2>40000)continue;
+      const d=Math.sqrt(d2),f=2600/d2*al;
+      V[ids[i]][0]+=dx/d*f;V[ids[i]][1]+=dy/d*f;V[ids[j]][0]-=dx/d*f;V[ids[j]][1]-=dy/d*f;
+    }
+    EDG.forEach(e=>{
+      const a=P[e.a],b=P[e.b],dx=b[0]-a[0],dy=b[1]-a[1],d=Math.sqrt(dx*dx+dy*dy)+.01;
+      const same=SK[e.a].dom===SK[e.b].dom,L=e.type==="R"?100-e.w*35:70,k=(same?.06:.012)*al,f=(d-L)/d*k;
+      V[e.a][0]+=dx*f;V[e.a][1]+=dy*f;V[e.b][0]-=dx*f;V[e.b][1]-=dy*f;
+    });
+    ids.forEach(id=>{const a=anch[SK[id].dom],p=P[id],v=V[id];for(let k=0;k<2;k++){v[k]+=(a[k]-p[k])*.03*al;v[k]*=.75;p[k]+=v[k]}p[0]=Math.max(70,Math.min(1130,p[0]));p[1]=Math.max(160,Math.min(560,p[1]))});
+    al*=.992;
+  }
+  const g=lrn.g,lg=S("g",null,g),ng=S("g",null,g),ag=S("g",null,g);lrn.ag=ag;
+  EDG.forEach(e=>{
+    const a=P[e.a],b=P[e.b];
+    const a2={stroke:e.type==="B"?"#EAF1F8":e.type==="R"?"#6CD0F5":"#F0A04F","stroke-width":e.type==="R"?.8+e.w*2.2:1.6,"stroke-opacity":.5,"pointer-events":"none"};
+    if(e.type==="P")a2["stroke-dasharray"]="6 5";
+    const l=S("line",Object.assign({x1:a[0],y1:a[1],x2:b[0],y2:b[1]},a2),lg);
+    lrn.edges.push({l,e,base:e.type==="R"?.45+.45*e.w:.8});
+  });
+  ids.forEach((id,idx)=>{
+    const sk=SK[id],r=6+Math.sqrt(sk.src)*.8;
+    const gg=S("g",{style:"cursor:pointer"},ng);
+    const c=S("circle",{cx:P[id][0],cy:P[id][1],r:0,fill:DOMC[sk.dom],stroke:"#070D18","stroke-width":2},gg);
+    const lab=S("text",{x:P[id][0],y:P[id][1],fill:"#EAF1F8","font-size":13,"font-weight":500,"text-anchor":"middle","dominant-baseline":"central","font-family":FONT,opacity:0,"paint-order":"stroke",stroke:"#070D18","stroke-width":4,"stroke-linejoin":"round","pointer-events":"none"},gg);lab.textContent=sk.name;
+    tip(gg,sk.name,sk.aliases.length?"Also called: "+sk.aliases.slice(0,4).map(a=>a.t).join(", "):"One name everywhere");
+    gg.addEventListener("click",ev=>{ev.stopPropagation();lrn.autoAt=0;lrn.sel=lrn.sel===id?null:id;lrnRefresh()});
+    lrn.nodes[id]={c,lab,r,x:P[id][0],y:P[id][1],lx:P[id][0],ly:P[id][1]+r+12,show:false,sc:0,tsc:1,top:1,tlab:0,lo:0,delay:.15+idx*.045};
+  });
+  const R=EDG.filter(e=>e.type==="R");
+  for(let i=0;i<30;i++){lrn.pulses.push({e:R[i%R.length],t:rnd(),sp:.12+rnd()*.15,el:S("circle",{r:2.8,fill:"#fff",opacity:.9,"pointer-events":"none"},g)})}
+  svgBgClick(lrn.g);
+})();
+function svgBgClick(){}
+svg.addEventListener("click",e=>{if(cur===1&&!(e.target.closest&&e.target.closest("g[style*=pointer]"))){lrn.autoAt=0;lrn.sel=null;lrnRefresh()}});
+function lrnAlias(){
+  lrn.aliasEls.forEach(a=>a.g.remove());lrn.aliasEls=[];lrn.aliasFor=null;
+  if(!lrn.sel)return;
+  const sk=SK[lrn.sel];lrn.aliasFor=lrn.sel;lrn.aliasT=0;
+  sk.aliases.slice(0,4).forEach((a,j)=>{
+    const g=S("g",{opacity:0,"pointer-events":"none"},lrn.ag),w=a.t.length*7.4+18;
+    S("rect",{x:-w/2,y:-12,width:w,height:24,rx:12,fill:"rgba(21,37,63,.96)",stroke:DOMC[sk.dom],"stroke-width":1.5},g);T(g,0,0,a.t,{size:12.5,mono:true});
+    lrn.aliasEls.push({g,j,n:Math.min(4,sk.aliases.length)});
+  });
+}
+function lrnRefresh(){
+  const sel=lrn.sel,foc=new Set();
+  if(sel){foc.add(sel);NB[sel].forEach(n=>foc.add(n.id))}
+  const bpm=lrn.all?null:Object.fromEntries(bp(ROLE).map(x=>[x.id,x]));
+  Object.keys(lrn.nodes).forEach(id=>{
+    const n=lrn.nodes[id],b=bpm&&bpm[id],c=bpm?(b?b.cls:"-"):null;
+    let sc=1,op=1,lab=SK[id].src>=34?.8:0;
+    if(bpm){if(c==="C"){sc=1.5;lab=1}else if(c==="S"){sc=1.1;op=.9;lab=0}else if(c==="N"){sc=.75;op=.3;lab=0}else{sc=.7;op=.22;lab=0}}
+    if(sel){const on=foc.has(id);if(!on){op=Math.min(op,.25);lab=0}else lab=1;if(id===sel){sc*=1.25;op=1}}
+    n.tsc=sc;n.top=op;n.tlab=lab;
+  });
+  lrn.edges.forEach(E=>{
+    let k=(!sel||E.e.a===sel||E.e.b===sel)?1:.07;
+    if(bpm){const a=bpm[E.e.a],b=bpm[E.e.b];if(!a||!b||a.cls==="N"||b.cls==="N")k*=.2}
+    E.tk=E.base*k;
+  });
+  placeLabels();
+  lrnAlias();
+}
+function placeLabels(){
+  const pri=id=>{const n=lrn.nodes[id];return (id===lrn.sel?1000:0)+n.tlab*100+SK[id].src/10};
+  const ids=Object.keys(lrn.nodes);ids.forEach(id=>lrn.nodes[id].show=false);
+  const boxes=[];
+  ids.filter(id=>lrn.nodes[id].tlab>.2).sort((a,b)=>pri(b)-pri(a)).forEach(id=>{
+    const n=lrn.nodes[id],w=SK[id].name.length*7+10,h=16,rr=n.r*n.tsc;
+    const cands=[[n.x,n.y+rr+11],[n.x,n.y-rr-11],[n.x+rr+6+w/2,n.y],[n.x-rr-6-w/2,n.y]];
+    for(const c of cands){
+      const b=[c[0]-w/2,c[1]-h/2,c[0]+w/2,c[1]+h/2];
+      if(!boxes.some(o=>b[0]<o[2]&&b[2]>o[0]&&b[1]<o[3]&&b[3]>o[1])){boxes.push(b);n.lx=c[0];n.ly=c[1];n.show=true;break}
+    }
+  });
+}
+function lrnAutoPick(){
+  if(lrn.sel)return;
+  const b=lrn.all?null:bp(ROLE).filter(x=>x.cls==="C").sort((a,c)=>c.w-a.w).find(x=>SK[x.id].aliases.length>1);
+  lrn.sel=b?b.id:"k8s";lrnRefresh();
+}
+function lrnUpdate(dt){
+  lrn.t+=dt;
+  if(lrn.autoAt&&lrn.t>=lrn.autoAt){lrn.autoAt=0;lrnAutoPick()}
+  const k=1-Math.exp(-dt*6);
+  Object.keys(lrn.nodes).forEach(id=>{
+    const n=lrn.nodes[id],ready=REDUCED||lrn.t>n.delay;
+    n.sc+=((ready?n.tsc:0)-n.sc)*k;
+    n.c.setAttribute("r",(n.r*n.sc).toFixed(2));
+    const o=+n.c.getAttribute("opacity")||0;n.c.setAttribute("opacity",(o+(n.top-o)*k).toFixed(3));
+    n.lo+=((ready&&n.show?n.tlab:0)-n.lo)*k;n.lab.setAttribute("opacity",n.lo.toFixed(3));n.lab.setAttribute("x",n.lx.toFixed(1));n.lab.setAttribute("y",n.ly.toFixed(1));
+  });
+  lrn.edges.forEach(E=>{const o=+E.l.getAttribute("stroke-opacity");const t=(E.tk==null?E.base:E.tk)*(lrn.t>1?1:lrn.t);E.l.setAttribute("stroke-opacity",(o+(t-o)*k).toFixed(3))});
+  lrn.pulses.forEach(p=>{p.t=(p.t+dt*p.sp)%1;const A=lrn.nodes[p.e.a],B=lrn.nodes[p.e.b];p.el.setAttribute("cx",lerp(A.x,B.x,p.t).toFixed(1));p.el.setAttribute("cy",lerp(A.y,B.y,p.t).toFixed(1))});
+  if(lrn.aliasFor){
+    lrn.aliasT+=dt;const n=lrn.nodes[lrn.aliasFor];
+    lrn.aliasEls.forEach(a=>{
+      const ang=lrn.aliasT*.7+a.j/a.n*Math.PI*2,pop=easeOut(clamp01((lrn.aliasT-a.j*.15)/.6)),R=(48+n.r*n.sc)*pop;
+      a.g.setAttribute("transform",`translate(${(n.x+Math.cos(ang)*R*1.5).toFixed(1)} ${(n.y+Math.sin(ang)*R*.8).toFixed(1)})`);a.g.setAttribute("opacity",pop.toFixed(2));
+    });
+  }
+}
+
+/* ======================= SHARED: DATABASE DRAWING ======================= */
+function drawDB(parent){
+  const g=S("g",null,parent),parts={};
+  const box=S("rect",{x:0,y:0,width:470,height:330,rx:22,fill:"rgba(108,208,245,.05)",stroke:"#6CD0F5","stroke-opacity":.6,"stroke-width":2},g);
+  tip(box,"Your company's database","Saved against your company only. Nothing is shared.");
+  const gc=S("g",{transform:"translate(110 165)"},g);
+  S("circle",{r:92,fill:"#6CD0F5",opacity:.08,filter:"url(#glw)"},gc);
+  seed=5;const pts=[],cols=Object.values(DOMC);
+  for(let i=0;i<18;i++)pts.push([(rnd()-.5)*140,(rnd()-.5)*140]);
+  pts.forEach((p,i)=>{pts.map((q,j)=>[j,(p[0]-q[0])**2+(p[1]-q[1])**2]).filter(x=>x[0]!==i).sort((a,b)=>a[1]-b[1]).slice(0,2).forEach(x=>{if(x[0]>i)S("line",{x1:p[0],y1:p[1],x2:pts[x[0]][0],y2:pts[x[0]][1],stroke:"#9DB1CB","stroke-opacity":.55},gc)})});
+  pts.forEach((p,i)=>S("circle",{cx:p[0],cy:p[1],r:5+(i*7%6),fill:cols[i%5]},gc));
+  const hit=S("circle",{r:90,fill:"transparent"},gc);tip(hit,PARTN.graph,PARTT.graph);
+  parts.graph={el:gc,flash:0,ax:110,ay:165,kind:"g"};
+  T(g,110,352,"Skill graph",{size:15,w:700});
+  SLABK.forEach((k,i)=>{
+    const y=22+i*58,r=S("rect",{x:250,y,width:200,height:44,rx:9,fill:PARTC[k]},g);tip(r,PARTN[k],PARTT[k]);
+    T(g,350,y+22,PARTN[k],{size:14.5,w:600,fill:"#06121C"});
+    parts[k]={el:r,flash:0,ax:250,ay:y+22,kind:"r"};
+  });
+  T(g,350,352,"Search index",{size:15,w:700});
+  return {g,parts,core:gc};
+}
+function dbUpdate(db,dt){
+  Object.keys(db.parts).forEach(k=>{
+    const p=db.parts[k];p.flash=Math.max(0,p.flash-dt*1.8);
+    if(p.kind==="r"){p.el.setAttribute("stroke","#fff");p.el.setAttribute("stroke-width",String(p.flash*6));p.el.setAttribute("stroke-opacity",String(p.flash))}
+    else p.el.setAttribute("transform",`translate(110 165) scale(${1+p.flash*.12})`);
+  });
+}
+
+/* ======================= STAGE 2: SAVE ======================= */
+const sav={g:gs[2],t:0,flows:[],ox:600,oy:190,sc:1};
+(function(){
+  const g=sav.g;
+  const dbg=S("g",{transform:`translate(${sav.ox} ${sav.oy})`},g);sav.db=drawDB(dbg);
+  /* sources */
+  const sk=S("g",{transform:"translate(160 235)"},g);
+  S("circle",{r:55,fill:"#6CD0F5",opacity:.1,filter:"url(#glw)"},sk);
+  seed=9;const sp=[];for(let i=0;i<10;i++)sp.push([(rnd()-.5)*90,(rnd()-.5)*70]);
+  sp.forEach((p,i)=>sp.forEach((q,j)=>{if(j>i&&(p[0]-q[0])**2+(p[1]-q[1])**2<1900)S("line",{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:"#9DB1CB","stroke-opacity":.6},sk)}));
+  sp.forEach((p,i)=>S("circle",{cx:p[0],cy:p[1],r:5+i%3*1.5,fill:Object.values(DOMC)[i%5]},sk));
+  tip(S("circle",{r:55,fill:"transparent"},sk),"Skill map","The canonical skills learned in step 2");
+  T(g,160,298,"Skill map",{size:14.5,w:600,fill:"#9DB1CB"});
+  const jb=S("g",{transform:"translate(160 385)"},g);
+  [[-14,150],[0,130],[14,112]].forEach((r,i)=>S("rect",{x:-r[1]/2,y:r[0]-8,width:r[1],height:16,rx:5,fill:"#F0A04F",opacity:i===2?.4:.9},jb));
+  tip(S("rect",{x:-75,y:-24,width:150,height:48,fill:"transparent"},jb),"Jobs","Each job with its must-have and nice-to-have skills");
+  T(g,160,424,"Jobs",{size:14.5,w:600,fill:"#9DB1CB"});
+  const pr=S("g",{transform:"translate(160 505)"},g);
+  [["#3DC9AE",-26],["#A28CFF",0],["#F27AA6",26]].forEach((c,i)=>{S("rect",{x:c[1]-34,y:-22+i*3,width:68,height:44,rx:8,fill:"#15253F",stroke:c[0],"stroke-width":2.5},pr)});
+  tip(S("rect",{x:-60,y:-24,width:120,height:50,fill:"transparent"},pr),"People records","Résumés, assessments, interviews, checks");
+  T(g,160,552,"People records",{size:14.5,w:600,fill:"#9DB1CB"});
+  const F=[[{x:215,y:235},"graph"],[{x:235,y:385},"jobs"],[{x:225,y:505},"cand"],[{x:225,y:505},"eval"],[{x:225,y:505},"integ"],[{x:225,y:505},"elig"]];
+  const dg=S("g",null,g);
+  F.forEach(([from,key],fi)=>{
+    const toks=[];
+    for(let k=0;k<4;k++){const c=S("circle",{r:6,fill:PARTC[key],opacity:0,style:`filter:drop-shadow(0 0 5px ${PARTC[key]})`},dg);toks.push({c,t:k/4+fi*.07,prev:0})}
+    sav.flows.push({from,key,toks});
+  });
+  const pg=S("g",{opacity:0},g);S("circle",{r:12,fill:"none",stroke:"#EAF1F8","stroke-width":4},pg);S("line",{x1:9,y1:9,x2:20,y2:20,stroke:"#EAF1F8","stroke-width":5,"stroke-linecap":"round"},pg);
+  sav.probe=pg;
+  sav.pl=T(g,1120,170,"Use cases search it",{size:15,w:600,anchor:"end"});
+})();
+function savUpdate(dt){
+  sav.t+=dt;dbUpdate(sav.db,dt);
+  const A=k=>({x:sav.ox+sav.db.parts[k].ax*sav.sc,y:sav.oy+sav.db.parts[k].ay*sav.sc});
+  sav.flows.forEach(f=>{
+    const to=A(f.key);if(f.key!=="graph")to.x=sav.ox+250;
+    const c={x:(f.from.x+to.x)/2,y:Math.min(f.from.y,to.y)-60};
+    f.toks.forEach(tk=>{
+      tk.prev=tk.t;tk.t=(tk.t+dt*(REDUCED?0:.2))%1;
+      const p=bez(f.from,c,to,ease(tk.t));tk.c.setAttribute("cx",p.x.toFixed(1));tk.c.setAttribute("cy",p.y.toFixed(1));
+      tk.c.setAttribute("opacity",(.95*Math.min(1,tk.t*6)*(1-Math.max(0,(tk.t-.92)*12))).toFixed(2));
+      if(tk.t<tk.prev&&!REDUCED)sav.db.parts[f.key].flash=1;
+    });
+  });
+  const keys=["graph","jobs","cand","elig"],T3=3,ph=sav.t/T3,ki=((Math.floor(ph)%keys.length)+keys.length)%keys.length,u=ph%1;
+  const tgt=A(keys[ki]);tgt.x+=(keys[ki]==="graph"?70:215);
+  const pu=REDUCED?.7:ease(clamp01(u*1.4)),p=bez({x:1140,y:260},{x:1050,y:tgt.y-70},tgt,pu);
+  sav.probe.setAttribute("transform",`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`);sav.probe.setAttribute("opacity",REDUCED?1:(clamp01(u*6)*(1-clamp01((u-.85)*6))).toFixed(2));
+  if(!REDUCED&&u>.62&&u<.68)sav.db.parts[keys[ki]].flash=Math.max(sav.db.parts[keys[ki]].flash,.9);
+}
+
+/* ======================= STAGE 3: USE CASES ======================= */
+const REC_PARTS=["jobs","graph","cand","elig","integ"];
+const UCS=[
+ ["Candidate recommendation","Ranks the people already in your pool for an open workflow, with reasons.","Recruiters, Hiring managers",REC_PARTS],
+ ["Skill search","Search a skill and also find its other names and neighbouring skills.","Recruiters",["graph"]],
+ ["Job description check","Flags too many must-haves, missing ones, or skills you never assess.","Recruiters, TA leaders",["jobs","cand"]],
+ ["Interview guides","Suggests questions for a candidate's unproven must-have skills.","Interviewers",["cand"]],
+ ["Assessment design","Maps assessment sections to must-have skills. Nothing tested twice.","Assessment designers",["jobs"]],
+ ["Evaluator calibration","Shows who scores a skill harder or softer than peers.","TA leaders",["eval"]],
+ ["Talent pool insights","Shows how deep your proven skills are against open roles.","Leadership",["cand","jobs"]],
+ ["Internal mobility","Matches employees' proven skills to open roles.","HR and employees",REC_PARTS]
+];
+const hub={g:gs[3],sel:0,t:0,sats:[],ox:458,oy:262,sc:.58};
+(function(){
+  const g=hub.g,bg=S("g",null,g);
+  const dbg=S("g",{transform:`translate(${hub.ox} ${hub.oy}) scale(${hub.sc})`},g);hub.db=drawDB(dbg);
+  T(g,600,hub.oy+hub.sc*352+30,"Your company only",{size:15,w:600,fill:"#6CD0F5"});
+  const POS=[[600,190,320,70],[150,235,250,56],[150,305,250,56],[150,375,250,56],[150,445,250,56],[1050,270,250,56],[1050,350,250,56],[1050,430,250,56]];
+  const beamsG=S("g",null,bg);
+  UCS.forEach((u,i)=>{
+    const [x,y,w,h]=POS[i],main=i===0;
+    const cg=S("g",{style:"cursor:pointer"},g);
+    S("rect",{x:x-w/2,y:y-h/2,width:w,height:h,rx:14,fill:main?"#103049":"#14233B",stroke:main?"#6CD0F5":"#3A5680","stroke-width":main?3:2},cg);
+    S("rect",{x:x-w/2+14,y:y-h/2+10,width:main?62:84,height:16,rx:8,fill:main?"#6CD0F5":"#8FA6C4"},cg);
+    T(cg,x-w/2+14+(main?31:42),y-h/2+18,main?"PHASE 1":"COMING NEXT",{size:9.5,mono:true,w:600,fill:"#06121C"});
+    T(cg,x-w/2+14,y+h/2-17,u[0],{size:main?19:15.5,w:700,anchor:"start"});
+    tip(cg,u[0],u[1]+" For: "+u[2]+".");
+    cg.addEventListener("click",ev=>{ev.stopPropagation();hub.sel=i;hubRefresh();buildCtl()});
+    const ex=i<=4&&i>0?x+w/2:i>=5?x-w/2:x,ey=y+(i===0?h/2:0);
+    const lines=u[3].map(k=>{
+      const ax=hub.ox+hub.db.parts[k].ax*hub.sc,ay=hub.oy+hub.db.parts[k].ay*hub.sc,tx=k==="graph"?ax:ax-12*hub.sc*0;
+      const p=S("path",{d:`M${ex} ${ey} C ${(ex+tx)/2} ${ey}, ${(ex+tx)/2} ${ay}, ${tx} ${ay}`,fill:"none",stroke:PARTC[k],"stroke-width":2,"stroke-opacity":.05},beamsG);
+      return {p,k,ax:tx,ay,ex,ey};
+    });
+    hub.sats.push({cg,lines,u,main,ex,ey});
+  });
+  hub.dots=[];for(let i=0;i<10;i++)hub.dots.push(S("circle",{r:4.5,fill:"#fff",opacity:0,style:"filter:drop-shadow(0 0 4px #fff)"},g));
+})();
+function hubRefresh(){
+  hub.sats.forEach((s,i)=>{const on=i===hub.sel;s.cg.setAttribute("opacity",on?1:.6);s.lines.forEach(L=>L.p.setAttribute("stroke-opacity",on?.7:.07))});
+}
+function hubUpdate(dt){
+  hub.t+=dt;dbUpdate(hub.db,dt);
+  const s=hub.sats[hub.sel];let k=0;
+  s.lines.forEach((L,j)=>{
+    for(let q=0;q<2;q++){
+      const u=REDUCED?.5:(hub.t*.45+j*.17+q*.5)%1,uu=q===0?u:1-u;
+      const p=bez({x:L.ex,y:L.ey},{x:(L.ex+L.ax)/2,y:(L.ey+L.ay)/2},{x:L.ax,y:L.ay},uu);
+      const d=hub.dots[k++];d.setAttribute("cx",p.x.toFixed(1));d.setAttribute("cy",p.y.toFixed(1));d.setAttribute("opacity",.95);d.setAttribute("fill",PARTC[L.k]);d.style.filter=`drop-shadow(0 0 4px ${PARTC[L.k]})`;
+    }
+    if(!REDUCED)hub.db.parts[L.k].flash=Math.max(hub.db.parts[L.k].flash,.4+.35*Math.sin(hub.t*3+j));
+  });
+  while(k<10)hub.dots[k++].setAttribute("opacity",0);
+}
+
+/* ======================= STAGE 4: CANDIDATE RECOMMENDATION ======================= */
+const REC={decay:true,adj:true};
+const REC_XS=[0,600,1200,1800,2400];
+const REC_STEPS=["Read the job","Widen with the skill map","Find people with evidence","Remove anyone not eligible","Rank with reasons"];
+const rec={g:gs[4],dyn:null,st:[],stg:[],lbls:[],T:[0,0,0,0,0],cx:1090,cy:0,s:.34,tx:0,ty:0,ts:.34};
+const months=ym=>{const p=ym.split("-").map(Number);return (REF[0]-p[0])*12+(REF[1]-p[1])};
+function credit(c,id){
+  const e=c.ev.filter(x=>x[0]===id).map(x=>{const d=REC.decay?Math.pow(.5,Math.max(0,months(x[2]))/HALF[SK[id].vol]):1;return {lv:x[1],v:EV.mult[x[1]]*d}}).sort((a,b)=>b.v-a.v);
+  return e[0]||null;
+}
+function bestFor(c,id){
+  let b=credit(c,id),kind="d";
+  if(!b&&REC.adj){NB[id].filter(n=>n.type==="R").forEach(n=>{const cr=credit(c,n.id);if(cr){const v=n.w*.5*cr.v;if(!b||v>b.v){b={lv:"A",v,via:n.id};kind="a"}}})}
+  return b?Object.assign({kind},b):null;
+}
+function scoreC(c){
+  const rows=bp(ROLE).filter(x=>x.cls!=="N"),parts={V:0,D:0,C:0,A:0};let den=0,nV=0;
+  rows.forEach(r=>den+=r.w);
+  rows.forEach(r=>{const b=bestFor(c,r.id);if(b){parts[b.kind==="a"?"A":b.lv]+=100*r.w*b.v/den;if(r.cls==="C"&&b.kind==="d"&&b.lv==="V")nV++}});
+  return {c,parts,score:parts.V+parts.D+parts.C+parts.A,nV,nCore:rows.filter(r=>r.cls==="C").length};
+}
+function covKinds(c){return bp(ROLE).filter(x=>x.cls==="C").map(r=>{const b=bestFor(c,r.id);return b?(b.kind==="a"?"A":b.lv):"X"})}
+function tokG(parent,c,w,h,edge,fs,dr,label){
+  const g=S("g",null,parent);
+  S("rect",{x:-w/2,y:-h/2,width:w,height:h,rx:h*.2,fill:"#15253F",stroke:edge||"#3A5680","stroke-width":3},g);
+  T(g,-w/2+10,-h/2+h*.28,label||c.name,{size:fs,w:600,fill:"#EAF1F8",anchor:"start"});
+  covKinds(c).forEach((k,i)=>{
+    const cx=-w/2+12+i*(dr*2.7),cy=h/2-h*.28,a={cx,cy,r:dr};
+    if(k==="V")S("circle",Object.assign(a,{fill:EVC.V}),g);
+    else if(k==="D")S("circle",Object.assign(a,{fill:EVC.D}),g);
+    else if(k==="C")S("circle",Object.assign(a,{fill:"none",stroke:EVC.C,"stroke-width":1.8,"stroke-dasharray":"3 2.5"}),g);
+    else if(k==="A")S("circle",Object.assign(a,{fill:"none",stroke:EVC.A,"stroke-width":1.8,"stroke-dasharray":"1.5 2.5"}),g);
+    else S("circle",Object.assign(a,{fill:"#2A3B57"}),g);
+  });
+  if(c.flag)S("path",{d:`M${w/2-16} ${-h/2+6} l10 18 l-20 0 z`,fill:"#F0A04F"},g);
+  return g;
+}
+/* S1 */
+function recS1(g){
+  const b=bp(ROLE),items=[];
+  const slab=S("rect",{x:-250,y:-24,width:110,height:48,rx:9,fill:PARTC.jobs},g);tip(slab,PARTN.jobs,PARTT.jobs);
+  T(g,-195,0,"Jobs and skills",{size:12.5,w:600,fill:"#06121C"});
+  const ring=S("circle",{cx:-195,cy:0,r:20,fill:"none",stroke:"#F0A04F","stroke-width":3},g);
+  [["C",-130,"Must have"],["S",0,"Nice to have"],["N",130,"Not needed"]].forEach(([k,y,nm])=>{
+    S("rect",{x:-120,y:y+22,width:370,height:4,rx:2,fill:"#6a86ad",opacity:.45},g);
+    T(g,-120,y+42,nm,{size:12.5,w:600,fill:"#9DB1CB",anchor:"start"});
+    const arr=b.filter(x=>x.cls===k).sort((a,c)=>c.w-a.w),n=arr.length,sp=Math.min(56,350/Math.max(1,n));
+    arr.forEach((x,i)=>{
+      const sk=SK[x.id],r=k==="N"?10:9+9*x.w,px=-96+i*sp,py=y+22-r-2;
+      const c=S("circle",{cx:px,cy:py,r,fill:k==="N"?"none":DOMC[sk.dom],stroke:k==="N"?DOMC[sk.dom]:"none","stroke-width":2,"stroke-dasharray":k==="N"?"3 3":"",opacity:k==="N"?.7:1},g);
+      tip(c,sk.name,CLS[k]+(k!=="N"?" · weight "+x.w.toFixed(2):""));
+      let lab=null;if(k==="C"){lab=T(g,px,py-r-10-(i%3)*14,sk.name,{size:11.5,w:500})}
+      items.push({c,lab,r,delay:(px+250)/500*1.4+.4});
+    });
+  });
+  return {update(t){
+    const tt=REDUCED?99:t%8,u=clamp01(tt/1.8);
+    ring.setAttribute("cx",lerp(-195,260,u));ring.setAttribute("r",20+u*40);ring.setAttribute("opacity",(1-u).toFixed(2));
+    items.forEach(it=>{const p=easeOut(clamp01((tt-it.delay)/.5));it.c.setAttribute("r",(it.r*p).toFixed(2));if(it.lab)it.lab.setAttribute("opacity",p)});
+  }};
+}
+/* S2 */
+function recS2(g){
+  const b=bp(ROLE),core=b.filter(x=>x.cls==="C").map(x=>x.id),inBp=new Set(b.map(x=>x.id)),cx=40;
+  const src=S("g",{transform:"translate(-215 0)"},g);
+  S("circle",{r:50,fill:"#6CD0F5",opacity:.12,filter:"url(#glw)"},src);
+  for(let i=0;i<7;i++)S("circle",{cx:Math.cos(i*.9)*26,cy:Math.sin(i*1.4)*30,r:5,fill:Object.values(DOMC)[i%5]},src);
+  tip(S("circle",{r:46,fill:"transparent"},src),PARTN.graph,PARTT.graph);
+  T(g,-215,62,"Skill graph",{size:12.5,w:600,fill:"#9DB1CB"});
+  const ring=S("circle",{cx:-215,cy:0,r:20,fill:"none",stroke:"#6CD0F5","stroke-width":3},g);
+  const n=core.length,items=[],cp={};
+  core.forEach((id,i)=>{const a=i/n*Math.PI*2-Math.PI/2;cp[id]={x:cx+Math.cos(a)*105,y:Math.sin(a)*92}});
+  const adj={};
+  core.forEach(id=>NB[id].filter(nn=>nn.type==="R"&&!inBp.has(nn.id)).forEach(nn=>{if(!adj[nn.id]||adj[nn.id].w<nn.w)adj[nn.id]={id:nn.id,from:id,w:nn.w}}));
+  const list=Object.values(adj).sort((a,c)=>c.w-a.w).slice(0,6),lg=S("g",null,g),ag=S("g",null,g);
+  list.forEach((e,i)=>{
+    const fp=cp[e.from],dx=fp.x-cx,dy=fp.y,d=Math.hypot(dx,dy)||1,p={x:fp.x+dx/d*95+(i%2?10:-10),y:fp.y+dy/d*85};
+    p.x=Math.max(-170,Math.min(250,p.x));p.y=Math.max(-190,Math.min(190,p.y));
+    const ln=S("line",{x1:fp.x,y1:fp.y,x2:p.x,y2:p.y,stroke:"#6CD0F5","stroke-width":2,"stroke-opacity":0},lg);
+    const c=S("circle",{cx:p.x,cy:p.y,r:0,fill:"none",stroke:"#6CD0F5","stroke-width":2,"stroke-dasharray":"4 3"},ag);tip(c,SK[e.id].name,"Related skill · "+e.w.toFixed(2)+" via "+SK[e.from].name);
+    const lab=T(ag,p.x,p.y+22,SK[e.id].name,{size:11.5,fill:"#6CD0F5",op:0});
+    const wl=T(ag,(fp.x+p.x)/2,(fp.y+p.y)/2-9,e.w.toFixed(2),{size:10.5,mono:true,fill:"#6CD0F5",op:0});
+    items.push({c,lab,wl,ln,delay:1.8+i*.45,r:13,kind:"adj"});
+  });
+  core.forEach((id,i)=>{
+    const p=cp[id],sk=SK[id],c=S("circle",{cx:p.x,cy:p.y,r:0,fill:DOMC[sk.dom]},ag);tip(c,sk.name,"Must-have skill");
+    const lab=T(ag,p.x,p.y+25,sk.name,{size:12,w:600,op:0});
+    items.push({c,lab,delay:.2+i*.1,r:16,kind:"core"});
+  });
+  const al=[];
+  core.filter(id=>SK[id].aliases.length>1).slice(0,2).forEach((id,j)=>{
+    SK[id].aliases.slice(0,3).forEach((a,q)=>{
+      const gg=S("g",{opacity:0,"pointer-events":"none"},g),w=a.t.length*6.4+16,side=cp[id].x>=cx?1:-1;
+      S("rect",{x:-w/2,y:-10,width:w,height:20,rx:10,fill:"rgba(21,37,63,.96)",stroke:DOMC[SK[id].dom],"stroke-width":1.3},gg);T(gg,0,0,a.t,{size:10.5,mono:true});
+      al.push({g:gg,id,q,ax:cp[id].x+side*(62+w/2),ay:cp[id].y-24+q*24});
+    });
+  });
+  return {update(t){
+    const tt=REDUCED?99:t%10,u=clamp01(tt/1.6);
+    ring.setAttribute("cx",lerp(-215,cx,u));ring.setAttribute("r",20+u*60);ring.setAttribute("opacity",(1-u).toFixed(2));
+    items.forEach(it=>{
+      const p=easeOut(clamp01((tt-it.delay)/.6));it.c.setAttribute("r",(it.r*p).toFixed(2));it.lab.setAttribute("opacity",p);
+      if(it.ln){it.ln.setAttribute("stroke-opacity",.7*p);it.wl.setAttribute("opacity",p)}
+    });
+    al.forEach(a=>{
+      const pop=easeOut(clamp01((tt-.9-a.q*.2)/.5));
+      a.g.setAttribute("transform",`translate(${a.ax.toFixed(1)} ${(a.ay+Math.sin(t*1.5+a.q)*2).toFixed(1)})`);a.g.setAttribute("opacity",pop.toFixed(2));
+    });
+  }};
+}
+/* S3 */
+function recS3(g){
+  const slab=S("rect",{x:-250,y:-26,width:110,height:52,rx:9,fill:PARTC.cand},g);tip(slab,PARTN.cand,PARTT.cand);
+  T(g,-195,0,"People and evidence",{size:11.5,w:600,fill:"#06121C"});
+  const ring=S("circle",{cx:-195,cy:0,r:20,fill:"none",stroke:"#3DC9AE","stroke-width":3},g);
+  const toks=POOL.map((c,i)=>{
+    const col=i%2,row=Math.floor(i/2),to={x:-20+col*170,y:-156+row*78},tg=tokG(g,c,152,58,null,14,6.5,c.name);
+    tip(tg,c.name,c.note+". Dots show evidence for each must-have skill.");
+    return {tg,to,delay:.8+i*.16};
+  });
+  return {update(t){
+    const tt=REDUCED?99:t%10,u=clamp01(tt/1.2);
+    ring.setAttribute("cx",lerp(-195,260,u));ring.setAttribute("r",20+u*50);ring.setAttribute("opacity",(1-u).toFixed(2));
+    toks.forEach(k=>{const p=easeOut(clamp01((tt-k.delay)/.8));tf(k.tg,lerp(-195,k.to.x,p),lerp(0,k.to.y,p),Math.max(.001,p))});
+  }};
+}
+/* S4 */
+function recS4(g){
+  const GX=[-100,-35,30,95],GN=["Consent","Blacklist","Cool-off","Retention"],GT={"Consent":0,"Blacklist":1,"Cool-off":2,"Retention":3};
+  GX.forEach((x,i)=>{
+    S("rect",{x:x-2.5,y:-185,width:5,height:370,rx:2.5,fill:"#FF6B5E",opacity:.55},g);
+    S("rect",{x:x-14,y:-185,width:28,height:370,rx:14,fill:"#FF6B5E",opacity:.1,filter:"url(#glw)"},g);
+    T(g,x,-205,GN[i],{size:12.5,w:600,fill:"#FF8A80"});
+  });
+  const slab=S("rect",{x:-255,y:196,width:100,height:30,rx:8,fill:PARTC.elig},g);tip(slab,PARTN.elig,PARTT.elig);T(g,-205,211,"Eligibility",{size:12,w:600,fill:"#06121C"});
+  const toks=POOL.map((c,i)=>{
+    const lane=i%5,round=Math.floor(i/5),y=(lane-2)*74;
+    const block=c.gate?GT[c.gate.type]:-1;
+    const tg=tokG(g,c,98,40,block>=0?"#FF6B5E":null,11.5,4,c.first);
+    const lock=S("g",{visibility:"hidden",transform:"translate(40 -14)"},tg);S("path",{d:"M-6 0 v-5 a6 6 0 0 1 12 0 v5",fill:"none",stroke:"#FF6B5E","stroke-width":2.5},lock);S("rect",{x:-8,y:0,width:16,height:12,rx:2,fill:"#FF6B5E"},lock);
+    tip(tg,c.name,c.gate?"Not ranked. "+c.gate.text:(c.flag?"Ranked, flagged: "+c.flag:"Passes every check"));
+    return {tg,lock,y,block,delay:round*5.2+lane*.45,stop:block>=0?GX[block]-62:999};
+  });
+  return {update(t){
+    const tt=REDUCED?99:t%16;
+    toks.forEach(k=>{
+      const e=tt-k.delay;let x=-195+440*clamp01(e/7.5);const blocked=x>=k.stop;x=Math.min(x,k.stop);
+      if(REDUCED)x=k.block>=0?k.stop:200;
+      k.tg.setAttribute("visibility",e>0||REDUCED?"visible":"hidden");
+      tf(k.tg,x,k.y,1);
+      k.lock.setAttribute("visibility",blocked||(REDUCED&&k.block>=0)?"visible":"hidden");
+      k.tg.setAttribute("opacity",k.block>=0&&(blocked||REDUCED)?.55:(x>200?clamp01(1-(x-200)/50):1));
+    });
+  }};
+}
+/* S5 */
+function recS5(g){
+  const all=POOL.map(scoreC),ok=all.filter(s=>!s.c.gate&&s.score>0).sort((a,b)=>b.score-a.score).slice(0,8);
+  const SX=58,x0=-(ok.length-1)*SX/2,H=2.5,base=150,bars=[];
+  S("rect",{x:x0-34,y:base,width:ok.length*SX+10,height:4,rx:2,fill:"#2f5a8f",opacity:.6},g);
+  ok.forEach((s,i)=>{
+    const x=x0+i*SX,bg=S("g",{transform:`translate(${x} ${base})`},g);let y=0;
+    const segs=[["V",EVC.V,1],["D",EVC.D,1],["C","none",0],["A","none",0]];
+    segs.forEach(([k,fill,solid])=>{
+      const h=s.parts[k]*H;if(h<.4)return;
+      const r=S("rect",{x:-17,y:-y-h,width:34,height:h,rx:3,fill:solid?fill:"rgba(140,163,158,.18)",stroke:solid?"none":(k==="C"?EVC.C:EVC.A),"stroke-width":solid?0:1.8,"stroke-dasharray":solid?"":(k==="C"?"5 3":"2 3")},bg);
+      tip(r,s.c.name+"  "+Math.round(s.score),`${s.nV} of ${s.nCore} must-have skills proven${s.c.flag?" · "+s.c.flag:""}`);y+=h;
+    });
+    T(g,x,base+22,s.c.first,{size:12,w:500,fill:"#9DB1CB"});
+    const sc=T(g,x,base-y-16,String(Math.round(s.score)),{size:20,w:700});
+    let warn=null;if(s.c.flag){warn=S("path",{d:"M0 -9 L9 7 L-9 7 Z",fill:"#F0A04F"},g);tip(warn,s.c.name,s.c.flag)}
+    bars.push({bg,sc,warn,x,h:y,i});
+  });
+  let rs=null;
+  if(ok[0]){const txt=`${ok[0].c.name}: ${ok[0].nV} of ${ok[0].nCore} must-haves proven`,w=txt.length*7.3+28;rs=S("g",{opacity:0},g);S("rect",{x:-w/2,y:-14,width:w,height:28,rx:14,fill:"#6CD0F5"},rs);T(rs,0,0,txt,{size:13,w:600,fill:"#06121C"});rs.setAttribute("transform",`translate(${x0} ${base-bars[0].h-60})`)}
+  return {update(t,dt,tAll){
+    bars.forEach(k=>{
+      const p=REDUCED?1:easeOut(clamp01((t-.3-k.i*.12)/.9));
+      k.bg.setAttribute("transform",`translate(${k.x} ${base}) scale(1 ${Math.max(.001,p)})`);
+      k.sc.setAttribute("y",base-k.h*p-16);k.sc.setAttribute("opacity",p);
+      if(k.warn){k.warn.setAttribute("transform",`translate(${k.x+30} ${base-k.h*p-16})`)}
+    });
+    if(rs)rs.setAttribute("opacity",REDUCED?1:clamp01((t-1.5)/.6));
+  }};
+}
+function recBuild(){
+  if(rec.dyn)rec.dyn.remove();
+  rec.dyn=S("g",null,rec.g);rec.st=[];rec.stg=[];rec.lbls=[];
+  const fns=[recS1,recS2,recS3,recS4,recS5];
+  REC_XS.forEach((x,i)=>{
+    const g=S("g",{transform:`translate(${x} 0)`},rec.dyn);rec.stg.push(g);
+    S("circle",{cx:0,cy:0,r:250,fill:"rgba(28,51,84,.18)",stroke:"#2f5a8f","stroke-opacity":.5,"stroke-width":2,"pointer-events":"none"},g);
+    const nm=S("g",null,g);rec.lbls.push(nm);
+    T(nm,-230,-262,String(i+1),{size:46,w:700,fill:"#6CD0F5"});
+    T(nm,-185,-262,REC_STEPS[i],{size:34,w:600,anchor:"start"});
+    const inner=S("g",null,g);rec.st.push(fns[i](inner));
+    if(i<4){S("path",{d:`M${x+265} 0 l36 0`,stroke:"#6CD0F5","stroke-width":3,transform:`translate(${-x} 0)`,fill:"none"},g);S("path",{d:"M290 -9 l18 9 l-18 9 z",fill:"#6CD0F5"},g)}
+  });
+  const tg=S("g",{transform:"translate(-460 0)"},rec.dyn);
+  S("rect",{x:-70,y:-45,width:140,height:90,rx:14,fill:"#15253F",stroke:"#6CD0F5","stroke-width":4},tg);
+  S("circle",{r:80,fill:"#6CD0F5",opacity:.15,filter:"url(#glw)"},tg);
+  [[-48,-10,96],[-48,6,70],[-48,22,86]].forEach(l=>S("rect",{x:l[0],y:l[1],width:l[2],height:7,rx:3.5,fill:"#2E4A70"},tg));
+  tip(tg,"An open workflow","A recruiter opens a workflow for a job. This starts the searches.");
+  T(tg,0,-78,"Open workflow",{size:22,w:700});T(tg,0,78,ROLES[ROLE].title,{size:19,w:500,fill:"#6CD0F5"});
+  S("path",{d:"M95 0 l60 0",stroke:"#6CD0F5","stroke-width":3,fill:"none"},tg);S("path",{d:"M155 -9 l18 9 l-18 9 z",fill:"#6CD0F5"},tg);
+  rec.trig=tg;rec.lbls.push(tg);
+  rec.T=[0,0,0,0,0];
+}
+function recUpdate(dt){
+  rec.T=rec.T.map(t=>t+dt);
+  rec.st.forEach((s,i)=>s.update(rec.T[i],dt,rec.T[i]));
+  const k=1-Math.exp(-dt*4);
+  rec.tx+=(rec.px-rec.tx)*k;rec.ty+=(rec.py-rec.ty)*k;rec.s+=(rec.ps-rec.s)*k;
+  rec.dyn.setAttribute("transform",`translate(${rec.tx.toFixed(1)} ${rec.ty.toFixed(1)}) scale(${rec.s.toFixed(4)})`);
+  const zoomed=cur===4&&true;
+  rec.stg.forEach((g,i)=>{const o=!zoomed||i===sub?1:0;const c=+(g.getAttribute("opacity")||1);g.setAttribute("opacity",(c+(o-c)*k).toFixed(3))});
+  rec.lbls.forEach((l,i)=>{const o=zoomed?0:1;const c=+(l.getAttribute("opacity")||1);l.setAttribute("opacity",(c+(o-c)*k).toFixed(3))});
+}
+function recCamera(){
+  if(cur!==4){return}
+  rec.ps=1.02;rec.px=600-REC_XS[sub]*rec.ps;rec.py=365;
+}
+
+/* ======================= OVERVIEW ======================= */
+const ov={g:gs[5],t:0,dots:[]};
+(function(){
+  const g=ov.g;
+  const X=[40,264,488,712,936],W=190;
+  const TL=[["1 Match","Interview → right job",0],["2 Learn","Skills each job needs",1],["3 Save","One database per company",2],["Use cases","Searches, not copies",3],["Recommendation","Open workflow → ranked people",4]];
+  /* inputs */
+  S("rect",{x:40,y:190,width:112,height:32,rx:16,fill:"none",stroke:"#3A5680","stroke-width":2},g);
+  S("rect",{x:168,y:190,width:86,height:32,rx:16,fill:"none",stroke:"#6CD0F5","stroke-width":2},g);
+  T(g,96,206,"Interviews",{size:13,w:600,fill:"#9DB1CB"});T(g,211,206,"JD title",{size:13,w:600,fill:"#6CD0F5"});
+  S("path",{d:"M135 230 C 135 255, 135 262, 135 280",stroke:"#6CD0F5","stroke-width":2.5,fill:"none"},g);
+  TL.forEach((t,i)=>{
+    const x=X[i],y=290,tg=S("g",{style:"cursor:pointer",transform:`translate(${x} ${y})`},g);
+    S("rect",{width:W,height:200,rx:18,fill:"#14233B",stroke:"#3A5680","stroke-width":2},tg);
+    S("rect",{x:0,y:0,width:W,height:200,rx:18,fill:"#6CD0F5",opacity:0,class:"hv"},tg);
+    const ic=S("g",{transform:`translate(${W/2} 78)`},tg);
+    if(i===0){[[-46,-26],[-46,6]].forEach(p=>S("rect",{x:p[0],y:p[1],width:34,height:22,rx:5,fill:"#15253F",stroke:"#6CD0F5","stroke-width":2},ic));S("rect",{x:16,y:-18,width:36,height:36,rx:8,fill:"#6F9BFF"},ic);S("path",{d:"M-8 -15 Q 6 -15 14 -4 M-8 17 Q 6 17 14 6",stroke:"#6CD0F5","stroke-width":2,fill:"none"},ic)}
+    if(i===1){seed=3;const p=[[-30,-18],[0,-30],[30,-14],[-14,10],[20,18],[-40,18]];[[0,1],[1,2],[0,3],[3,4],[2,4],[5,3]].forEach(e=>S("line",{x1:p[e[0]][0],y1:p[e[0]][1],x2:p[e[1]][0],y2:p[e[1]][1],stroke:"#9DB1CB"},ic));p.forEach((q,k)=>S("circle",{cx:q[0],cy:q[1],r:7+k%3*2,fill:Object.values(DOMC)[k%5]},ic))}
+    if(i===2){S("rect",{x:-48,y:-36,width:96,height:72,rx:12,fill:"rgba(108,208,245,.08)",stroke:"#6CD0F5","stroke-width":2},ic);for(let k=0;k<4;k++)S("rect",{x:-6,y:-26+k*14,width:46,height:9,rx:3,fill:Object.values(PARTC)[k+1]},ic);S("circle",{cx:-26,cy:0,r:12,fill:"#6CD0F5",opacity:.8},ic)}
+    if(i===3){S("rect",{x:-18,y:-14,width:36,height:28,rx:6,fill:"#6CD0F5",opacity:.9},ic);[[-48,-30],[-48,4],[24,-30],[24,4]].forEach(p=>{S("rect",{x:p[0],y:p[1],width:24,height:16,rx:4,fill:"#15253F",stroke:"#6a86ad","stroke-width":1.5},ic);S("line",{x1:p[0]+(p[0]<0?24:0),y1:p[1]+8,x2:p[0]<0?-18:18,y2:0,stroke:"#6CD0F5","stroke-opacity":.6},ic)})}
+    if(i===4){[34,52,26,18].forEach((h,k)=>{S("rect",{x:-44+k*24,y:30-h,width:18,height:h,rx:3,fill:k===0?EVC.V:EVC.D},ic)})}
+    T(tg,W/2,150,t[0],{size:20,w:700,fill:"#EAF1F8"});
+    T(tg,W/2,176,t[1],{size:12.5,w:500,fill:"#9DB1CB"});
+    tg.addEventListener("click",()=>goStage(t[2],false,0));
+    tg.addEventListener("pointerenter",()=>tg.firstChild.setAttribute("stroke","#6CD0F5"));tg.addEventListener("pointerleave",()=>tg.firstChild.setAttribute("stroke","#3A5680"));
+    if(i<4)S("path",{d:`M${x+W+6} 390 l${224-W-12} 0`,stroke:"#6CD0F5","stroke-width":2.5,fill:"none","stroke-dasharray":"6 5"},g);
+    if(i<4)for(let k=0;k<2;k++)ov.dots.push({el:S("circle",{r:4.5,fill:"#6CD0F5",style:"filter:drop-shadow(0 0 4px #6CD0F5)"},g),x0:x+W+6,x1:x+224-6,t:k/2+i*.13});
+  });
+  [[40,678,"BUILD · once per company","#6CD0F5"],[712,1126,"USE · again and again","#F0A04F"]].forEach(([a,b,t,c])=>{
+    S("path",{d:`M${a} 506 v9 h${b-a} v-9`,fill:"none",stroke:c,"stroke-width":2.5,opacity:.8},g);
+    T(g,(a+b)/2,538,t,{size:14,w:700,fill:c});
+  });
+  T(g,600,582,"Saved once per company. Every use case searches it.",{size:14,w:500,fill:"#9DB1CB"});
+  g.setAttribute("transform","translate(17 -10)");
+})();
+function ovUpdate(dt){ov.dots.forEach(d=>{d.t=(d.t+dt*(REDUCED?0:.25))%1;d.el.setAttribute("cx",lerp(d.x0,d.x1,d.t).toFixed(1));d.el.setAttribute("cy",390)})}
+
+/* ======================= WHY ======================= */
+const why={g:gs[6],t:0,pills:[],big:null,tick:null};
+(function(){
+  const g=why.g;
+  const panel=(x,title,good)=>{
+    S("rect",{x,y:112,width:520,height:490,rx:20,fill:good?"rgba(108,208,245,.05)":"rgba(255,107,94,.04)",stroke:good?"#6CD0F5":"#6a4a58","stroke-opacity":.55,"stroke-width":2},g);
+    T(g,x+260,144,title,{size:22,w:700,fill:good?"#6CD0F5":"#FF8A80"});
+  };
+  panel(60,"Today",false);panel(620,"With a skill ontology",true);
+  const rowT=(x,y,t)=>T(g,x+26,y,t,{size:17,w:600,anchor:"start"});
+  const pill=(parent,cx,cy,txt,o)=>{o=o||{};const w=txt.length*8.4+24,gg=S("g",{transform:`translate(${cx} ${cy})`},parent);S("rect",{x:-w/2,y:-15,width:w,height:30,rx:15,fill:o.fill||"#15253F",stroke:o.stroke||"#3A5680","stroke-width":2,"stroke-dasharray":o.dash||""},gg);T(gg,0,0,txt,{size:14,mono:true,fill:o.tc||"#EAF1F8"});return gg};
+  const cap=(x,y,t)=>T(g,x,y,t,{size:12.5,fill:"#9DB1CB"});
+  /* left */
+  rowT(60,200,"Same skill, different words");
+  pill(g,150,250,"React.js");pill(g,305,250,"ReactJS");pill(g,440,250,"React");
+  T(g,228,250,"≠",{size:26,w:700,fill:"#FF6B5E"});T(g,373,250,"≠",{size:26,w:700,fill:"#FF6B5E"});
+  cap(320,284,"Counted as three different skills");
+  rowT(60,340,"Claims without proof");
+  S("rect",{x:110,y:366,width:210,height:42,rx:10,fill:"#15253F",stroke:"#3A5680","stroke-width":2},g);T(g,215,387,"Résumé: Kubernetes",{size:14});
+  S("circle",{cx:380,cy:387,r:18,fill:"none",stroke:"#FF6B5E","stroke-width":2.5,"stroke-dasharray":"4 3"},g);T(g,380,387,"?",{size:20,w:700,fill:"#FF6B5E"});
+  T(g,412,387,"Nobody checked",{size:13,fill:"#9DB1CB",anchor:"start"});
+  rowT(60,448,"Job posts read differently");
+  [[110,"Company A",["#6F9BFF","#6F9BFF","#F0A04F"]],[360,"Company B",["#46C8B6","#F27AA6","#F27AA6"]]].forEach(([x,n,cols])=>{
+    S("rect",{x,y:474,width:170,height:54,rx:10,fill:"#15253F",stroke:"#3A5680","stroke-width":2},g);T(g,x+12,491,"Senior Engineer",{size:13,w:600,anchor:"start"});
+    cols.forEach((c,i)=>S("circle",{cx:x+22+i*20,cy:513,r:6,fill:c},g));T(g,x+95,513,n,{size:11,fill:"#9DB1CB",anchor:"start"});
+  });
+  T(g,325,501,"≠",{size:26,w:700,fill:"#FF6B5E"});
+  cap(320,560,"Same title, different skills");
+  /* right */
+  rowT(620,200,"One name per skill");
+  why.pills=[[760,"React.js"],[880,"ReactJS"],[1000,"React"]].map(([x,t])=>({x,g:pill(g,x,250,t)}));
+  why.big=pill(g,880,250,"React",{fill:"rgba(61,201,174,.18)",stroke:"#3DC9AE"});
+  why.tick=T(g,946,250,"✓",{size:22,w:700,fill:"#3DC9AE"});
+  cap(880,284,"Counted as one skill");
+  rowT(620,340,"Every skill graded by proof");
+  [[740,"Claimed","résumé",0],[880,"Demonstrated","assessment",1],[1020,"Validated","interview",2]].forEach(([x,n,src,k])=>{
+    S("rect",{x:x-58,y:366,width:116,height:42,rx:10,fill:k===2?EVC.V:k===1?EVC.D:"none",stroke:k===0?EVC.C:"none","stroke-width":2,"stroke-dasharray":"5 4"},g);
+    T(g,x,387,n,{size:13.5,w:600,fill:k===0?"#EAF1F8":"#06121C"});T(g,x,422,src,{size:12,fill:"#9DB1CB"});
+  });
+  rowT(620,448,"Learned from your own jobs");
+  S("rect",{x:660,y:474,width:240,height:54,rx:10,fill:"#15253F",stroke:"#3A5680","stroke-width":2},g);T(g,672,491,"Senior Backend Engineer",{size:13,w:600,anchor:"start"});
+  ["#6F9BFF","#6F9BFF","#6F9BFF","#F0A04F","#A28CFF","#F27AA6"].forEach((c,i)=>S("circle",{cx:682+i*20,cy:513,r:6,fill:c},g));
+  [0,1,2,3].forEach(i=>S("circle",{cx:812+i*20,cy:513,r:6,fill:"none",stroke:"#6a86ad","stroke-width":1.8},g));
+  T(g,688,543,"must have",{size:11,fill:"#9DB1CB",anchor:"start"});T(g,818,543,"nice to have",{size:11,fill:"#9DB1CB",anchor:"start"});
+  cap(1000,501,"");
+})();
+function whyUpdate(dt){
+  why.t+=dt;const t=REDUCED?3:why.t%6.5;
+  const m=ease(clamp01((t-1.6)/.9));
+  why.pills.forEach(p=>{p.g.setAttribute("transform",`translate(${lerp(p.x,880,m).toFixed(1)} 250)`);p.g.setAttribute("opacity",(1-m).toFixed(2))});
+  why.big.setAttribute("opacity",m.toFixed(2));why.tick.setAttribute("opacity",m.toFixed(2));
+}
+/* ======================= SUMMARY ======================= */
+(function(){
+  const g=gs[7];
+  const tiles=[
+    [60,130,"Evidence, not keywords","People are matched on proven skills, and every ranking shows its reason."],
+    [620,130,"Built from your own interviews","Your jobs and your conversations define the skills. No generic list."],
+    [60,330,"Private to each company","One database per company. Nothing is shared or combined."],
+    [620,330,"One foundation, many uses","Candidate recommendation comes first. Search, job checks and interview guides reuse it."]
+  ];
+  tiles.forEach(([x,y,t,d],i)=>{
+    S("rect",{x,y,width:520,height:170,rx:20,fill:"#14233B",stroke:"#3A5680","stroke-width":2},g);
+    const ic=S("g",{transform:`translate(${x+70} ${y+85})`},g);
+    S("circle",{r:42,fill:"rgba(108,208,245,.1)",stroke:"#6CD0F5","stroke-width":2},ic);
+    if(i===0){[[-18,10,22],[-4,-2,34],[10,-14,46]].forEach((b,k)=>S("rect",{x:b[0]-5,y:b[1]-b[2]/2+10,width:12,height:b[2],rx:3,fill:k===2?EVC.V:EVC.D},ic))}
+    if(i===1){[[-14,-6],[-6,0],[2,6]].forEach((b,k)=>S("rect",{x:b[0]-14,y:b[1]-14,width:34,height:24,rx:5,fill:"#15253F",stroke:["#3DC9AE","#A28CFF","#F27AA6"][k],"stroke-width":2.5},ic))}
+    if(i===2){S("path",{d:"M-12 -4 v-8 a12 12 0 0 1 24 0 v8",fill:"none",stroke:"#6CD0F5","stroke-width":4},ic);S("rect",{x:-18,y:-4,width:36,height:28,rx:6,fill:"#6CD0F5"},ic)}
+    if(i===3){S("rect",{x:-26,y:12,width:52,height:12,rx:3,fill:"#6CD0F5"},ic);[-22,-4,14].forEach((x2,k)=>S("rect",{x:x2,y:-16+k%2*6,width:14,height:24,rx:3,fill:["#F0A04F","#3DC9AE","#A28CFF"][k]},ic))}
+    T(g,x+140,y+66,t,{size:22,w:700,anchor:"start"});
+    const words=d.split(" ");let line="",ly=y+102;
+    words.forEach(w=>{if((line+" "+w).length>38){T(g,x+140,ly,line.trim(),{size:14.5,fill:"#B9C8DC",anchor:"start"});line=w;ly+=22}else line+=" "+w});
+    T(g,x+140,ly,line.trim(),{size:14.5,fill:"#B9C8DC",anchor:"start"});
+  });
+  T(g,600,552,"Phase 1: candidate recommendation for open workflows",{size:16,w:600,fill:"#6CD0F5"});
+})();
+
+/* ======================= HUD / NAV ======================= */
+const FLOW=-1,WHY=-2,OUT=5;
+const CAPS={
+  "-2":["Hiring runs on guesses today","Why a skill ontology"],
+  "-1":["From interviews to a skill map you can search","Build once. Use many times."],
+  0:["Match each interview to the right job","Click the red card"],
+  1:["Learn the skills each job needs","Pick a role. Click a skill"],
+  2:["Save it once, privately per company","Hover the database parts"],
+  3:["Every use case just searches it","Click a card to see its searches"],
+  4:["Candidate recommendation for an open workflow","Step through the searches"],
+  5:["What your company gets","Evidence-based, private, reusable"]
+};
+const STORY={
+  "-2":[["WHAT","A skill ontology is your company's map of every skill it hires for, how skills relate, and what each job needs."],["HOW","Built from your own interviews, saved once, searched by every use case."]],
+  "-1":[["IN","Interview transcripts and each job's title"],["OUT","A skill ontology, saved once per company"],["WHY","Every use case searches it. Nothing is rebuilt."]],
+  0:[["IN","Interview recordings and the job descriptions"],["OUT","Every interview filed under the right job"],["WHY","A mis-filed interview would teach the wrong skills"]],
+  1:[["IN","Interviews filed by job"],["OUT","One list of skills, one name each, and what each job needs"],["WHY","A shared language of skills, learned from your own hiring"]],
+  2:[["IN","The skill map, the jobs and people records"],["OUT","One private database per company"],["WHY","Saved once. Nothing is shared with other companies"]],
+  3:[["IN","A request from a use case"],["OUT","Answers found by searching the database"],["WHY","New use cases reuse the same foundation. Nothing is copied"]],
+  5:[["NOW","Start with candidate recommendation (Phase 1)"],["NEXT","Search, job checks, interview guides and more reuse the same foundation"]]
+};
+function adjList(){
+  const b=bp(ROLE),inBp=new Set(b.map(x=>x.id)),core=b.filter(x=>x.cls==="C").map(x=>x.id),adj={};
+  core.forEach(id=>NB[id].filter(nn=>nn.type==="R"&&!inBp.has(nn.id)).forEach(nn=>{if(!adj[nn.id]||adj[nn.id].w<nn.w)adj[nn.id]={id:nn.id,from:id,w:nn.w}}));
+  return Object.values(adj).sort((a,c)=>c.w-a.w).slice(0,6);
+}
+function recStory(j){
+  const b=bp(ROLE),nC=b.filter(x=>x.cls==="C").length,nS=b.filter(x=>x.cls==="S").length,job=ROLES[ROLE].title;
+  const gated=POOL.filter(c=>c.gate).length,elig=POOL.length-gated;
+  const top=POOL.map(scoreC).filter(x=>!x.c.gate&&x.score>0).sort((a,c)=>c.score-a.score)[0];
+  return [
+    [["IN","A recruiter opens a workflow for "+job],["OUT",nC+" must-have and "+nS+" nice-to-have skills"],["WHY","The job is read from what your company really assesses"]],
+    [["IN","Those "+(nC+nS)+" skills"],["OUT","Their other names, plus "+adjList().length+" related skills"],["WHY","'k8s' and 'Kubernetes' count as one. Close skills earn partial credit"]],
+    [["IN","The widened skill list"],["OUT",POOL.length+" people, each with evidence per skill"],["WHY","Proof from an interview counts more than a résumé claim"]],
+    [["IN",POOL.length+" people"],["OUT",elig+" eligible, "+gated+" held back"],["WHY","Consent, blacklist, cool-off and retention rules apply before anyone is ranked"]],
+    [["IN","Eligible people and their evidence"],["OUT","A ranked shortlist"+(top?". "+top.c.name+" leads at "+Math.round(top.score):"")],["WHY","Each score comes with its reason"]]
+  ][j];
+}
+const SUBCAP=[
+  ["Read the job","Search: the job's must-have skills"],
+  ["Widen with the skill map","Search: other names and related skills"],
+  ["Find people with evidence","Search: each person's proven skills"],
+  ["Remove anyone not eligible","Search: consent, blacklist, cool-off, retention"],
+  ["Rank with reasons","Hover a bar"]
+];
+const SEQ=[[-2,0],[-1,0],[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[4,2],[4,3],[4,4],[5,0]];
+const HASHES=["why","flow","match","learn","save","usecases","recommendation","summary"];
+let cur=-2,sub=0;
+const stageOf=i=>i===-2?6:i===-1?5:i===5?7:i;
+function setStory(){
+  const rows=cur===4?recStory(sub):(STORY[cur]||[]);
+  $("#story").innerHTML=rows.map(r=>`<div class="r"><span class="k${r[0]==="WHY"?" w":""}">${r[0]}</span><span class="v">${esc(r[1])}</span></div>`).join("");
+}
+function setCaption(){
+  if(cur===4){$("#cap").textContent=SUBCAP[sub][0];$("#hint").textContent=SUBCAP[sub][1]}
+  else{$("#cap").textContent=CAPS[cur][0];$("#hint").textContent=CAPS[cur][1]}
+  setStory();layoutStage();
+}
+function applyRecCam(){
+  if(cur===4){rec.ps=Math.min(VW*.94/540,VH*.97/510,2.6);rec.px=600-REC_XS[sub]*rec.ps;rec.py=360}
+  else{rec.ps=.34;rec.px=600-1090*.34;rec.py=360}
+}
+function goStage(i,keep,s){
+  cur=i;if(i===4)sub=s==null?0:s;
+  gs.forEach((g,k)=>{const on=k===stageOf(i);g.setAttribute("opacity",on?1:0);g.setAttribute("pointer-events",on?"auto":"none")});
+  setCaption();
+  document.querySelectorAll(".stp").forEach(b=>b.setAttribute("aria-current",String(+b.dataset.i===i)));
+  if(i===0){mt.t=0;mt.cards.forEach(c=>{c.arrived=false;c.released=false})}
+  if(i===1){lrn.t=0;lrn.sel=null;lrn.autoAt=3.2;lrnRefresh()}
+  if(i===3)hubRefresh();
+  if(i===4)rec.T[sub]=0;
+  if(i===-2)why.t=0;
+  applyRecCam();
+  buildCtl();
+  try{history.replaceState(null,"","#"+HASHES[i+2])}catch(e){}
+}
+function goSub(j){sub=j;rec.T[j]=0;applyRecCam();setCaption();buildCtl()}
+function buildCtl(){
+  const c=$("#ctl");let h="";
+  const roles=(all,label)=>`<div class="chips" role="group" aria-label="Role">${label?`<span class="chip">${label}</span>`:""}`+(all?`<button class="chip" data-role="all" aria-pressed="${lrn.all}">All roles</button>`:"")+Object.keys(ROLEN).map(k=>`<button class="chip" data-role="${k}" aria-pressed="${k===ROLE&&!(all&&lrn.all)}"><i style="background:${ROLEC[k]}"></i>${ROLEN[k]}</button>`).join("")+`</div>`;
+  const nA=TAGS.filter(t=>t[2]==="auto").length,nR=TAGS.filter(t=>t[2]==="review").length,nH=TAGS.filter(t=>t[2]==="held").length;
+  if(cur===-2)h=`<div class="chips"><button class="chip primary" data-next="1">Start the walkthrough →</button></div>`;
+  if(cur===-1)h=`<div class="chips"><button class="chip primary" data-next="1">Start with step 1 →</button></div>`;
+  if(cur===0)h=`<div class="chips"><span class="chip"><i style="background:${STATC.auto}"></i>${nA} matched automatically</span><span class="chip"><i style="background:${STATC.review}"></i>${nR} checked by a person</span><span class="chip"><i style="background:${STATC.held}"></i>${nH} on hold</span></div>`;
+  if(cur===1)h=roles(true)+`<div class="chips"><span class="chip"><i style="background:#EAF1F8;width:13px;height:13px"></i>Must have</span><span class="chip"><i style="background:#EAF1F8;opacity:.7"></i>Nice to have</span><span class="chip"><i style="background:#EAF1F8;opacity:.25;width:7px;height:7px"></i>Not needed</span></div>`;
+  if(cur===2)h=`<div class="chips"><span class="chip"><i style="background:${PARTC.graph}"></i>Skills and how they relate</span><span class="chip"><i style="background:${PARTC.jobs}"></i>Jobs</span><span class="chip"><i style="background:${PARTC.cand}"></i>People</span><span class="chip"><i style="background:${PARTC.elig}"></i>Rules</span></div>`;
+  if(cur===3){
+    const u=UCS[hub.sel];
+    h=`<div class="chips"><span class="chip" style="border-color:var(--accent)">${esc(u[0])}</span><span class="chip">Searches</span>`+u[3].map(k=>`<span class="chip"><i style="background:${PARTC[k]}"></i>${PARTN[k]}</span>`).join("")+`</div><div class="chips">`+(hub.sel===0?`<button class="chip primary" data-open="rec">See how it works →</button>`:`<span class="chip">Step-by-step breakdown coming next</span>`)+`</div>`;
+  }
+  if(cur===4){
+    h=`<div class="chips" role="group" aria-label="Step">`+["Read job","Widen","Find people","Check","Rank"].map((n,i)=>`<button class="chip" data-sub="${i}" aria-pressed="${i===sub}">${i+1} ${n}</button>`).join("")+`</div>`+roles(false,"Open workflow for")+
+      `<div class="chips">`+(sub>=1&&sub<=4?`<button class="chip" id="adjBtn" aria-pressed="${REC.adj}">Use related skills</button>`:"")+(sub===4?`<button class="chip" id="decayBtn" aria-pressed="${REC.decay}">Recent counts more</button><span class="chip"><i class="sq" style="background:${EVC.V}"></i>Proven in interview</span><span class="chip"><i class="sq" style="background:${EVC.D}"></i>Shown in assessment</span><span class="chip"><i class="sq hol" style="color:#8CA39E"></i>Stated on résumé</span><span class="chip"><i class="sq hol" style="color:#6CD0F5"></i>Related skill</span>`:"")+(sub===2?`<span class="chip"><i style="background:${EVC.V}"></i>Proven</span><span class="chip"><i style="background:${EVC.D}"></i>Shown</span><span class="chip"><i class="hol" style="color:#8CA39E"></i>Stated</span><span class="chip"><i class="hol" style="color:#6CD0F5"></i>Related</span><span class="chip"><i style="background:#2A3B57"></i>None</span>`:"")+`</div>`;
+  }
+  if(cur===5)h=`<div class="chips"><button class="chip" data-restart="1">Replay from the start</button></div>`;
+  c.innerHTML=h;layoutStage();
+}
+$("#ctl").addEventListener("click",e=>{
+  const r=e.target.closest("[data-role]");
+  if(r){
+    if(r.dataset.role==="all")lrn.all=true;else{ROLE=r.dataset.role;lrn.all=false}
+    if(cur===1){lrn.sel=null;lrn.autoAt=lrn.t+1.8;lrnRefresh()}
+    if(cur===4){recBuild();applyRecCam();rec.T[sub]=0;setStory()}
+    buildCtl();return;
+  }
+  const sb=e.target.closest("[data-sub]");if(sb){goSub(+sb.dataset.sub);return}
+  if(e.target.closest("[data-open]")){goStage(4,false,0);return}
+  if(e.target.closest("[data-next]")){step(1);return}
+  if(e.target.closest("[data-restart]")){goStage(-2);return}
+  if(e.target.closest("#adjBtn")){REC.adj=!REC.adj;recBuild();applyRecCam();setStory();buildCtl();return}
+  if(e.target.closest("#decayBtn")){REC.decay=!REC.decay;recBuild();applyRecCam();rec.T[4]=0;setStory();buildCtl()}
+});
+(function(){
+  const s=$("#steps");
+  s.innerHTML=`<button class="stp arr" data-d="-1" aria-label="Previous">‹</button><button class="stp" data-i="-2">Why</button><button class="stp" data-i="-1">Overview</button><span class="grp">Build once</span>`+
+    ["Match","Learn","Save"].map((n,i)=>`<button class="stp" data-i="${i}"><i>${i+1}</i>${n}</button>`).join("")+`<span class="grp">Use</span><button class="stp" data-i="3">Use cases</button><button class="stp" data-i="4">Recommendation</button><span class="grp"></span><button class="stp" data-i="5">Summary</button><button class="stp arr" data-d="1" aria-label="Next">›</button>`;
+  s.addEventListener("click",e=>{
+    const b=e.target.closest(".stp");if(!b)return;
+    if(b.dataset.d){step(+b.dataset.d)}else goStage(+b.dataset.i);
+  });
+})();
+function seqIndex(){return SEQ.findIndex(q=>q[0]===cur&&(cur!==4||q[1]===sub))}
+function step(d){const n=SEQ[(seqIndex()+d+SEQ.length)%SEQ.length];goStage(n[0],false,n[1])}
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight"){step(1);e.preventDefault()}
+  if(e.key==="ArrowLeft"){step(-1);e.preventDefault()}
+  if(e.key===" "){toggleTour();e.preventDefault()}
+});
+let tourT=null;
+function toggleTour(){
+  if(tourT){clearInterval(tourT);tourT=null}else{tourT=setInterval(()=>step(1),9000);step(1)}
+  $("#tour").setAttribute("aria-pressed",String(!!tourT));
+}
+$("#tour").onclick=toggleTour;
+$("#reset").onclick=()=>goStage(cur,true,sub);
+if(!document.fullscreenEnabled)$("#fs").hidden=true;
+$("#fs").onclick=()=>{try{if(document.fullscreenElement)document.exitFullscreen();else{const p=document.documentElement.requestFullscreen();if(p&&p.catch)p.catch(()=>{})}}catch(e){}};
+document.addEventListener("fullscreenchange",()=>{$("#fs").textContent=document.fullscreenElement?"Exit":"Present"});
+
+/* ---------- drawing area sits between caption and controls ---------- */
+let VW=1200,VH=520;
+function layoutStage(){
+  if(!innerWidth||!innerHeight)return;
+  const cap=$("#capwrap").getBoundingClientRect(),ctl=$("#ctl"),stp=$(".steps>div").getBoundingClientRect();
+  const top=Math.ceil(cap.bottom+10);
+  const ctlTop=ctl.children.length?ctl.getBoundingClientRect().top:innerHeight;
+  const bottom=Math.min(ctlTop,stp.top)-10;
+  const h=Math.max(180,bottom-top),a=innerWidth/h;
+  svg.style.top=top+"px";svg.style.height=h+"px";
+  if(a>=1200/520){VH=520;VW=520*a}else{VW=1200;VH=1200/a}
+  svg.setAttribute("viewBox",`${600-VW/2} ${360-VH/2} ${VW} ${VH}`);
+  if(typeof applyRecCam==="function"&&rec.dyn)applyRecCam();
+}
+function resize(){layoutStage()}
+addEventListener("resize",resize);addEventListener("load",resize);
+if(window.ResizeObserver){const ro=new ResizeObserver(layoutStage);ro.observe($("#ctl"));ro.observe($("#capwrap"));ro.observe($(".steps>div"))}
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(layoutStage);
+
+/* ---------- loop ---------- */
+let last=performance.now();
+function frame(now){
+  const dt=Math.max(0,Math.min(.05,(now-last)/1000));last=now;
+  matchUpdate(dt);lrnUpdate(dt);savUpdate(dt);hubUpdate(dt);recUpdate(dt);ovUpdate(dt);whyUpdate(dt);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- boot ---------- */
+resize();
+recBuild();lrnRefresh();hubRefresh();
+rec.tx=600-1090*.34;rec.ty=360;rec.s=.34;rec.px=rec.tx;rec.py=rec.ty;rec.ps=.34;
+const h0=(location.hash||"").replace("#","").toLowerCase();
+const start=HASHES.indexOf(h0)-2;
+goStage(start>=-2&&h0?start:-2,false,0);
+if(cur===4){rec.tx=rec.px;rec.ty=rec.py;rec.s=rec.ps}
+requestAnimationFrame(frame);
+addEventListener("hashchange",()=>{const i=HASHES.indexOf((location.hash||"").replace("#","").toLowerCase())-2;if(i>=-2&&i!==cur)goStage(i,false,0)});
+})();
+</script>
+</body>
+</html>
