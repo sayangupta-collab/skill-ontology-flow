@@ -360,7 +360,7 @@ const svg=$("#stage");
 const defs=S("defs",null,svg);
 S("filter",{id:"glw",x:"-50%",y:"-50%",width:"200%",height:"200%"},defs).innerHTML='<feGaussianBlur stdDeviation="4"/>';
 const gs=[];
-for(let i=0;i<9;i++){const g=S("g",{class:"stg",opacity:0,"pointer-events":"none"},svg);gs.push(g)}
+for(let i=0;i<10;i++){const g=S("g",{class:"stg",opacity:0,"pointer-events":"none"},svg);gs.push(g)}
 /* gs[0..4] = Match, Learn, Save, Use cases, Recommendation; gs[5] = overview; gs[6] = why; gs[7] = summary */
 
 /* ---------- tooltips ---------- */
@@ -647,6 +647,7 @@ const UCS=[
  ["Skill search","Search a skill and also find its other names and neighbouring skills.","Recruiters",["graph"]],
  ["Job description check","Flags too many must-haves, missing ones, or skills you never assess.","Recruiters, TA leaders",["jobs","cand"]],
  ["Interview guides","Suggests questions for a candidate's unproven must-have skills.","Interviewers",["jobs","cand","graph"]],
+ ["Interviewer suggestions","Proposes the best interviewers for a round while it is being scheduled.","Recruiters, Interview coordinators",["jobs","cand","eval","graph"]],
  ["Assessment design","Maps assessment sections to must-have skills. Nothing tested twice.","Assessment designers",["jobs"]],
  ["Evaluator calibration","Shows who scores a skill harder or softer than peers.","TA leaders",["eval"]],
  ["Talent pool insights","Shows how deep your proven skills are against open roles.","Leadership",["cand","jobs"]],
@@ -657,7 +658,7 @@ const hub={g:gs[3],sel:0,t:0,sats:[],ox:458,oy:262,sc:.58};
   const g=hub.g,bg=S("g",null,g);
   const dbg=S("g",{transform:`translate(${hub.ox} ${hub.oy}) scale(${hub.sc})`},g);hub.db=drawDB(dbg);
   T(g,600,hub.oy+hub.sc*352+30,"Your company only",{size:15,w:600,fill:"#6CD0F5"});
-  const POS=[[600,190,320,70],[150,235,250,56],[150,305,250,56],[150,375,250,56],[150,445,250,56],[1050,270,250,56],[1050,350,250,56],[1050,430,250,56]];
+  const POS=[[600,190,320,70],[150,235,250,56],[150,305,250,56],[150,375,250,56],[150,445,250,56],[1050,235,250,56],[1050,305,250,56],[1050,375,250,56],[1050,445,250,56]];
   const beamsG=S("g",null,bg);
   UCS.forEach((u,i)=>{
     const [x,y,w,h]=POS[i],main=i===0;
@@ -1148,6 +1149,221 @@ function guideStory(j){
   ][j];
 }
 
+/* ======================= INTERVIEWER SUGGESTIONS ======================= */
+const IVS=[
+ ["anika","Anika Rao","Staff engineer",{sysdes:[14,.1],micro:[11,.05],python:[9,-.1],kafka:[7,0],rest:[8,.1],prob:[10,0]},null],
+ ["leo","Leo Martins","Backend lead",{python:[18,0],sql:[12,.15],pg:[10,0],rest:[9,-.1],prob:[8,.1]},null],
+ ["nadia","Nadia Haddad","Site reliability",{k8s:[9,0],docker:[8,0],aws:[10,.1],sysdes:[6,0],prob:[12,0]},"Busy at 14:00"],
+ ["ethan","Ethan Brooks","Engineering manager",{comm:[20,0],prob:[15,-.1],stake:[9,0],sysdes:[4,.35]},null],
+ ["sana","Sana Iqbal","Frontend lead",{react:[16,0],ts:[12,.05],a11y:[9,0],perf:[8,.1],js:[14,0],html:[10,0]},null],
+ ["jonas","Jonas Weber","Full-stack engineer",{js:[10,0],react:[9,0],node:[6,0],rest:[7,0],ts:[8,-.1],docker:[4,0]},null],
+ ["marta","Marta Silva","Data lead",{sql:[15,0],stats:[12,0],powerbi:[9,.1],viz:[11,0],excel:[10,0]},null],
+ ["omar","Omar Farouk","Customer success director",{renew:[14,0],stake:[12,0],empathy:[9,0],acct:[11,.1],conflict:[7,0],comm:[15,0]},null],
+ ["grace","Grace Okafor","Customer success lead",{renew:[8,0],crm:[10,.4],acct:[7,0],empathy:[6,0],comm:[9,0]},null]
+].map(a=>({id:a[0],name:a[1],title:a[2],sk:a[3],busy:a[4],first:a[1].split(" ")[0],ini:a[1].split(" ").map(x=>x[0]).join("")}));
+const EARLY={be:"leo",fe:"jonas",da:"marta",csm:"grace"};
+const SLOT="Thu 14:00 to 14:45";
+const SGSTEPS=["Open the request","Map interviewers to skills","Apply scheduling rules","Score and rank","Propose in the scheduler"];
+const SGCAP=[
+  ["Open the request","Search: the job and this person's gaps"],
+  ["Map interviewers to skills","Search: past scorecards, by interviewer"],
+  ["Apply scheduling rules","Check: calendar and earlier rounds"],
+  ["Score and rank","Fit: skills the round needs × skills they have assessed"],
+  ["Propose in the scheduler","Suggestions appear while scheduling"]
+];
+function covOf(iv,id){
+  const d=iv.sk[id];
+  if(d)return {v:Math.min(1,d[0]/8)*(Math.abs(d[1])<=.25?1:.8),via:null,direct:true,n:d[0],cons:Math.abs(d[1])<=.25};
+  let best=null;
+  if(REC.adj)NB[id].filter(n=>n.type==="R").forEach(n=>{const e=iv.sk[n.id];if(e){const v=n.w*.5*Math.min(1,e[0]/8);if(!best||v>best.v)best={v,via:n.id,direct:false,n:0,cons:true}}});
+  return best||{v:0,via:null,direct:false,n:0,cons:true};
+}
+function sgPlan(){
+  const gp=gdPlan(),needs=gp.picks.map(x=>({id:x.id,p:x.p,st:x.st}));
+  const tot=needs.reduce((a,x)=>a+x.p,0)||1;
+  const early=EARLY[ROLE];
+  const rows=IVS.map(iv=>{
+    const cov=needs.map(n=>({n,c:covOf(iv,n.id)}));
+    const fit=100*cov.reduce((a,x)=>a+x.n.p*x.c.v,0)/tot;
+    const block=iv.busy?{k:0,t:iv.busy}:(iv.id===early?{k:1,t:"Ran round 1"}:null);
+    return {iv,cov,fit,block,covers:cov.filter(x=>x.c.direct&&x.c.v>=.5).length};
+  });
+  const ranked=rows.filter(r=>!r.block&&r.fit>=10).sort((a,b)=>b.fit-a.fit);
+  return {gp,needs,tot,rows,ranked,held:rows.filter(r=>r.block)};
+}
+const sg={g:gs[9],dyn:null,st:[],stg:[],T:[0,0,0,0,0],tx:0,ty:360,s:1,px:0,py:360,ps:1};
+function sS1(g){
+  const pl=sgPlan(),c=pl.gp.c,items=[];
+  S("rect",{x:-250,y:-196,width:330,height:92,rx:14,fill:"#15253F",stroke:"#6CD0F5","stroke-width":3},g);
+  T(g,-234,-176,"SCHEDULING REQUEST",{size:10.5,mono:true,w:600,fill:"#6CD0F5",anchor:"start"});
+  T(g,-234,-151,"Round 2 · "+c.name,{size:20,w:700,anchor:"start"});
+  T(g,-234,-124,ROLES[ROLE].title+" · "+SLOT,{size:12.5,fill:"#9DB1CB",anchor:"start"});
+  S("path",{d:"M-195 -102 v36",stroke:"#6CD0F5","stroke-width":2.5,fill:"none"},g);S("path",{d:"M-203 -70 l8 12 l8 -12 z",fill:"#6CD0F5"},g);
+  const sj=S("rect",{x:-250,y:-50,width:130,height:44,rx:9,fill:PARTC.jobs},g);tip(sj,PARTN.jobs,PARTT.jobs);T(g,-185,-28,"Jobs and skills",{size:12,w:600,fill:"#06121C"});
+  const sc=S("rect",{x:-250,y:6,width:130,height:44,rx:9,fill:PARTC.cand},g);tip(sc,PARTN.cand,PARTT.cand);T(g,-185,28,"People and evidence",{size:11.5,w:600,fill:"#06121C"});
+  const ring=S("circle",{cx:-185,cy:-6,r:18,fill:"none",stroke:"#F0A04F","stroke-width":3},g);
+  T(g,-100,-70,"This round must cover",{size:11,mono:true,fill:"#6a86ad",anchor:"start"});
+  pl.needs.forEach((n,i)=>{
+    const y=-36+i*52,gg=S("g",{opacity:0},g),sk=SK[n.id];
+    S("rect",{x:-100,y:y-22,width:350,height:44,rx:10,fill:"#14233B",stroke:DOMC[sk.dom],"stroke-width":2},gg);
+    T(gg,-86,y-6,sk.name,{size:14,w:700,anchor:"start"});
+    T(gg,-86,y+12,"Gap: "+STL[n.st][0].toLowerCase(),{size:11,fill:"#9DB1CB",anchor:"start"});
+    S("rect",{x:50,y:y-5,width:150,height:10,rx:5,fill:"#2A3B57"},gg);
+    const bar=S("rect",{x:50,y:y-5,width:Math.max(6,n.p/Math.max(.01,pl.needs[0].p)*150),height:10,rx:5,fill:"#6CD0F5"},gg);
+    T(gg,232,y,n.p.toFixed(2),{size:11,mono:true,fill:"#6CD0F5"});
+    tip(gg,sk.name,"Needed in this round. Priority "+n.p.toFixed(2)+" (importance × gap)");
+    items.push({gg,delay:1.2+i*.5});
+  });
+  T(g,75,176,"Same needs as the interview guide",{size:11.5,fill:"#9DB1CB"});
+  return {update(t){
+    const tt=REDUCED?99:t%10,u=clamp01(tt/1.4);
+    ring.setAttribute("cx",lerp(-185,-95,u));ring.setAttribute("r",18+u*30);ring.setAttribute("opacity",(1-u).toFixed(2));
+    items.forEach(it=>it.gg.setAttribute("opacity",easeOut(clamp01((tt-it.delay)/.5))));
+  }};
+}
+function sS2(g){
+  const pl=sgPlan(),K=pl.needs.length,items=[],colW=84,cx0=-5;
+  const slab=S("rect",{x:-250,y:-198,width:126,height:34,rx:9,fill:PARTC.eval},g);tip(slab,PARTN.eval,PARTT.eval);T(g,-187,-181,"Interview results",{size:11.5,w:600,fill:"#06121C"});
+  const ring=S("circle",{cx:-187,cy:-181,r:16,fill:"none",stroke:"#A28CFF","stroke-width":3},g);
+  pl.needs.forEach((n,k)=>{const nm=SK[n.id].name;const ls=nm.length>12&&nm.includes(" ")?nm.split(" "):[nm];ls.forEach((l,i)=>T(g,cx0+k*colW,-176+i*12,l,{size:10.5,w:600,fill:DOMC[SK[n.id].dom]}))});
+  const rows=pl.rows,step=Math.min(33,300/rows.length),y0=-138;
+  rows.forEach((r,i)=>{
+    const y=y0+i*step,gg=S("g",{opacity:0},g);
+    S("rect",{x:-250,y:y-step/2+1,width:520,height:step-2,rx:6,fill:i%2?"rgba(255,255,255,.02)":"rgba(255,255,255,.045)"},gg);
+    T(gg,-240,y-6,r.iv.name,{size:12.5,w:600,anchor:"start"});T(gg,-240,y+8,r.iv.title,{size:9.5,fill:"#8DA0B8",anchor:"start"});
+    r.cov.forEach((cv,k)=>{
+      const x=cx0+k*colW,c=cv.c,col=DOMC[SK[cv.n.id].dom];
+      if(c.direct){
+        const rad=3.5+Math.min(14,c.n)*.62;
+        const ce=S("circle",{cx:x,cy:y,r:rad,fill:col,opacity:c.cons?1:.4},gg);tip(ce,r.iv.name+": "+SK[cv.n.id].name,c.n+" interviews assessed"+(c.cons?", scores consistent":", tends to score harder or softer than peers"));
+        if(!c.cons)S("circle",{cx:x,cy:y,r:rad+3,fill:"none",stroke:col,"stroke-width":1.2,"stroke-dasharray":"2 2"},gg);
+      }else if(c.via){
+        const ce=S("circle",{cx:x,cy:y,r:6,fill:"none",stroke:"#6CD0F5","stroke-width":1.6,"stroke-dasharray":"2 2.5"},gg);tip(ce,r.iv.name+": "+SK[cv.n.id].name,"Not assessed directly. Related skill: "+SK[c.via].name);
+      }else S("circle",{cx:x,cy:y,r:2.5,fill:"#2A3B57"},gg);
+    });
+    items.push({gg,delay:.9+i*.17});
+  });
+  T(g,10,170,"Bigger dot = more interviews assessed. Faded = scores differ from peers",{size:10.5,fill:"#9DB1CB"});
+  return {update(t){
+    const tt=REDUCED?99:t%12,u=clamp01(tt/1.2);
+    ring.setAttribute("cx",lerp(-187,260,u));ring.setAttribute("r",16+u*40);ring.setAttribute("opacity",(1-u).toFixed(2));
+    items.forEach(it=>it.gg.setAttribute("opacity",easeOut(clamp01((tt-it.delay)/.4))));
+  }};
+}
+function sS3(g){
+  const pl=sgPlan(),GX=[-55,95],GN=["Free at 14:00","New to this candidate"];
+  GX.forEach((x,i)=>{
+    S("rect",{x:x-2.5,y:-175,width:5,height:350,rx:2.5,fill:"#FF6B5E",opacity:.55},g);
+    S("rect",{x:x-14,y:-175,width:28,height:350,rx:14,fill:"#FF6B5E",opacity:.1,filter:"url(#glw)"},g);
+    T(g,x,-196,GN[i],{size:12.5,w:600,fill:"#FF8A80"});
+  });
+  const sl=S("rect",{x:-255,y:196,width:120,height:30,rx:8,fill:"#6a86ad"},g);tip(sl,"Calendar and earlier rounds","Kept by the scheduler, not by the skill map");T(g,-195,211,"Calendar + rounds",{size:11,w:600,fill:"#06121C"});
+  const rows=pl.rows,step=Math.min(36,330/rows.length),y0=-((rows.length-1)*step)/2;
+  const toks=rows.map((r,i)=>{
+    const y=y0+i*step,tg=S("g",{opacity:0},g),blk=!!r.block;
+    S("rect",{x:-60,y:-15,width:120,height:30,rx:8,fill:"#15253F",stroke:blk?"#FF6B5E":"#3A5680","stroke-width":2.5},tg);
+    T(tg,-50,blk?-3:0,r.iv.name,{size:12,w:600,anchor:"start"});
+    const rs=blk?T(tg,-50,9,r.block.t,{size:9,fill:"#FF8A80",anchor:"start",op:0}):null;
+    tip(tg,r.iv.name,blk?"Not suggested: "+r.block.t:"Passes both checks");
+    return {tg,rs,y,blk,stop:blk?GX[r.block.k]-72:999,delay:i*.55};
+  });
+  return {update(t){
+    const tt=REDUCED?99:t%16;
+    toks.forEach(k=>{
+      const e=tt-k.delay;let x=-170+400*clamp01(e/8);const hit=x>=k.stop;x=Math.min(x,k.stop);
+      if(REDUCED)x=k.blk?k.stop:170;
+      k.tg.setAttribute("transform",`translate(${x.toFixed(1)} ${k.y.toFixed(1)})`);
+      k.tg.setAttribute("opacity",e<0&&!REDUCED?0:(k.blk&&(hit||REDUCED)?.7:(x>170?clamp01(1-(x-170)/40):1)));
+      if(k.rs)k.rs.setAttribute("opacity",hit||REDUCED?1:0);
+    });
+  }};
+}
+function sS4(g){
+  const pl=sgPlan(),items=[],list=pl.ranked.slice(0,6);
+  pl.needs.forEach((n,k)=>{
+    const x=-250+k*128;S("circle",{cx:x+6,cy:-196,r:5,fill:DOMC[SK[n.id].dom]},g);T(g,x+16,-196,SK[n.id].name,{size:11,anchor:"start"});
+  });
+  const y0=-140,step=44;
+  list.forEach((r,i)=>{
+    const y=y0+i*step,gg=S("g",null,g),best=i===0;
+    T(gg,-70,y-6,r.iv.name,{size:13,w:best?700:600,anchor:"end"});T(gg,-70,y+9,r.iv.title,{size:9.5,fill:"#8DA0B8",anchor:"end"});
+    S("rect",{x:-60,y:y-11,width:250,height:22,rx:11,fill:"#15253F"},gg);
+    const segs=[];let acc=0;
+    r.cov.forEach(cv=>{const w=250*(cv.n.p*cv.c.v)/pl.tot;if(w>.5){const rc=S("rect",{x:-60+acc,y:y-11,width:0,height:22,fill:DOMC[SK[cv.n.id].dom],opacity:cv.c.direct?1:.45},gg);segs.push({rc,x:-60+acc,w});acc+=w}});
+    const lab=T(gg,-60+acc+10,y,Math.round(r.fit)+"%",{size:14,w:700,anchor:"start",fill:best?"#6CD0F5":"#EAF1F8",op:0});
+    if(best)T(gg,190,y-19,"BEST FIT",{size:9.5,mono:true,w:600,fill:"#6CD0F5",anchor:"end"});
+    tip(gg,r.iv.name+": "+Math.round(r.fit)+"% fit","Covers "+r.covers+" of "+pl.needs.length+" needed skills with direct experience");
+    items.push({segs,lab,delay:.5+i*.3,end:-60+acc+10});
+  });
+  if(pl.held.length)T(g,-250,178,"Not suggested: "+pl.held.map(h=>h.iv.first+" ("+h.block.t.toLowerCase()+")").join(", "),{size:11,fill:"#FF8A80",anchor:"start"});
+  return {update(t){
+    const tt=REDUCED?99:t%12;
+    items.forEach(it=>{const p=easeOut(clamp01((tt-it.delay)/.8));it.segs.forEach(s=>s.rc.setAttribute("width",(s.w*p).toFixed(1)));it.lab.setAttribute("opacity",p)});
+  }};
+}
+function sS5(g){
+  const pl=sgPlan(),c=pl.gp.c,top=pl.ranked.slice(0,3);
+  S("rect",{x:-240,y:-186,width:500,height:344,rx:16,fill:"#0f1c30",stroke:"#3A5680","stroke-width":2.5},g);
+  S("path",{d:"M-240 -170 a16 16 0 0 1 16 -16 h468 a16 16 0 0 1 16 16 v22 h-500 z",fill:"#15253F"},g);
+  [0,1,2].forEach(i=>S("circle",{cx:-222+i*14,cy:-168,r:4,fill:["#FF6B5E","#F0A04F","#3DC9AE"][i]},g));
+  T(g,-170,-168,"Schedule interview · Round 2",{size:12.5,w:600,anchor:"start"});
+  T(g,-224,-130,"Candidate",{size:10.5,mono:true,fill:"#6a86ad",anchor:"start"});T(g,-150,-130,c.name+" · "+ROLES[ROLE].title,{size:12.5,anchor:"start"});
+  T(g,-224,-110,"Time",{size:10.5,mono:true,fill:"#6a86ad",anchor:"start"});T(g,-150,-110,SLOT,{size:12.5,anchor:"start"});
+  T(g,-224,-84,"SUGGESTED INTERVIEWERS",{size:10.5,mono:true,w:600,fill:"#6CD0F5",anchor:"start"});
+  const rows=top.map((r,i)=>{
+    const y=-38+i*64,gg=S("g",{opacity:0},g);
+    const hl=S("rect",{x:-228,y:y-28,width:476,height:58,rx:10,fill:"rgba(108,208,245,.1)",stroke:"#6CD0F5","stroke-width":1.5,opacity:0},gg);
+    S("rect",{x:-228,y:y-28,width:476,height:58,rx:10,fill:"none",stroke:"#2A3B57","stroke-width":1.5},gg);
+    S("circle",{cx:-200,cy:y,r:16,fill:"#26406a"},gg);T(gg,-200,y,r.iv.ini,{size:12,w:700});
+    T(gg,-174,y-9,r.iv.name,{size:14,w:700,anchor:"start"});T(gg,-174,y+9,r.iv.title,{size:10.5,fill:"#9DB1CB",anchor:"start"});
+    const nm=r.cov.length;r.cov.forEach((cv,k)=>S("circle",{cx:-30+k*17,cy:y-7,r:5.5,fill:cv.c.direct&&cv.c.v>=.5?DOMC[SK[cv.n.id].dom]:"none",stroke:cv.c.direct&&cv.c.v>=.5?"none":"#6a86ad","stroke-width":1.5},gg));
+    T(gg,-30,y+11,"Covers "+r.covers+" of "+nm,{size:10.5,fill:"#9DB1CB",anchor:"start"});
+    T(gg,110,y-7,Math.round(r.fit)+"% fit",{size:15,w:700,fill:"#6CD0F5"});
+    const add=S("g",null,gg);S("rect",{x:150,y:y-14,width:84,height:28,rx:14,fill:i===0?"#6CD0F5":"none",stroke:"#6CD0F5","stroke-width":1.8},add);const at=T(add,192,y,"Add",{size:12.5,w:600,fill:i===0?"#06121C":"#6CD0F5"});
+    tip(gg,r.iv.name,"Suggested because they have assessed "+r.covers+" of the "+nm+" skills this round needs");
+    return {gg,hl,at,y,delay:.6+i*.4};
+  });
+  const foot=S("g",{opacity:.3},g);
+  S("rect",{x:-228,y:128,width:476,height:24,rx:8,fill:"rgba(61,201,174,.15)"},foot);
+  T(foot,-216,140,"✓ Interview guide ready: "+pl.needs.length+" questions on "+pl.needs.map(n=>SK[n.id].name).slice(0,2).join(", ")+(pl.needs.length>2?" and more":""),{size:11.5,w:600,fill:"#3DC9AE",anchor:"start"});
+  return {update(t){
+    const tt=REDUCED?99:t%12;
+    rows.forEach(r=>r.gg.setAttribute("opacity",easeOut(clamp01((tt-r.delay)/.4))));
+    const added=REDUCED||tt>5;
+    if(rows[0]){rows[0].hl.setAttribute("opacity",tt>4?1:0);rows[0].at.textContent=added?"Added ✓":"Add"}
+    foot.setAttribute("opacity",added?1:.3);
+  }};
+}
+function sgBuild(){
+  if(sg.dyn)sg.dyn.remove();
+  sg.dyn=S("g",null,sg.g);sg.st=[];sg.stg=[];
+  const fns=[sS1,sS2,sS3,sS4,sS5];
+  REC_XS.forEach((x,i)=>{
+    const g=S("g",{transform:`translate(${x} 0)`},sg.dyn);sg.stg.push(g);
+    S("circle",{cx:0,cy:0,r:250,fill:"rgba(28,51,84,.18)",stroke:"#2f5a8f","stroke-opacity":.5,"stroke-width":2,"pointer-events":"none"},g);
+    sg.st.push(fns[i](S("g",null,g)));
+  });
+  sg.T=[0,0,0,0,0];
+}
+function sgUpdate(dt){
+  sg.T=sg.T.map(t=>t+dt);
+  sg.st.forEach((s,i)=>s.update(sg.T[i],dt));
+  const k=1-Math.exp(-dt*4);
+  sg.tx+=(sg.px-sg.tx)*k;sg.ty+=(sg.py-sg.ty)*k;sg.s+=(sg.ps-sg.s)*k;
+  sg.dyn.setAttribute("transform",`translate(${sg.tx.toFixed(1)} ${sg.ty.toFixed(1)}) scale(${sg.s.toFixed(4)})`);
+  sg.stg.forEach((g,i)=>{const o=cur!==7||i===sub?1:0;const c=+(g.getAttribute("opacity")||1);g.setAttribute("opacity",(c+(o-c)*k).toFixed(3))});
+}
+function schedStory(j){
+  const pl=sgPlan(),top=pl.ranked[0],job=ROLES[ROLE].title,K=pl.needs.length;
+  return [
+    [["IN","A recruiter schedules round 2 for "+pl.gp.c.name+" ("+job+")"],["OUT","The "+K+" skills this round must cover"],["WHY","Needs come from the job and what is still unproven"]],
+    [["IN","Those "+K+" skills"],["OUT","How much each of "+pl.rows.length+" interviewers has assessed them"],["WHY","Learned from past scorecards, not from job titles"]],
+    [["IN",pl.rows.length+" interviewers"],["OUT",(pl.rows.length-pl.held.length)+" available, "+pl.held.length+" held back"],["WHY","Calendar and earlier-round rules apply before anyone is suggested"]],
+    [["IN","Needed skills × each person's assessed skills"],["OUT",top?top.iv.name+" leads at "+Math.round(top.fit)+"% fit":"No match"],["WHY","Direct experience counts fully, related skills partly"]],
+    [["IN","The ranked list"],["OUT","Suggestions inside the scheduling screen"],["WHY","One click adds them, and the interview guide is ready for the round"]]
+  ][j];
+}
+
 /* ======================= OVERVIEW ======================= */
 const ov={g:gs[5],t:0,dots:[]};
 (function(){
@@ -1273,7 +1489,8 @@ const CAPS={
   3:["Every use case just searches it","Click a card to see its searches"],
   4:["Candidate recommendation for an open workflow","Step through the searches"],
   5:["What your company gets","Evidence-based, private, reusable"],
-  6:["Interview guides, built from the skill ontology","Step through the searches"]
+  6:["Interview guides, built from the skill ontology","Step through the searches"],
+  7:["Interviewer suggestions while scheduling","Step through the searches"]
 };
 const STORY={
   "-2":[["WHAT","A skill ontology is your company's map of every skill it hires for, how skills relate, and what each job needs."],["HOW","Built from your own interviews, saved once, searched by every use case."]],
@@ -1308,23 +1525,24 @@ const SUBCAP=[
   ["Remove anyone not eligible","Search: consent, blacklist, cool-off, retention"],
   ["Rank with reasons","Hover a bar"]
 ];
-const SEQ=[[-2,0],[-1,0],[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[4,2],[4,3],[4,4],[6,0],[6,1],[6,2],[6,3],[6,4],[5,0]];
-const HASHES=["why","flow","match","learn","save","usecases","recommendation","summary","interviewguides"];
+const SEQ=[[-2,0],[-1,0],[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[4,2],[4,3],[4,4],[6,0],[6,1],[6,2],[6,3],[6,4],[7,0],[7,1],[7,2],[7,3],[7,4],[5,0]];
+const HASHES=["why","flow","match","learn","save","usecases","recommendation","summary","interviewguides","interviewersuggestions"];
 let cur=-2,sub=0;
-const stageOf=i=>i===-2?6:i===-1?5:i===5?7:i===6?8:i;
+const stageOf=i=>i===-2?6:i===-1?5:i===5?7:i===6?8:i===7?9:i;
 function setStory(){
-  const rows=cur===4?recStory(sub):cur===6?guideStory(sub):(STORY[cur]||[]);
+  const rows=cur===4?recStory(sub):cur===6?guideStory(sub):cur===7?schedStory(sub):(STORY[cur]||[]);
   $("#story").innerHTML=rows.map(r=>`<div class="r"><span class="k${r[0]==="WHY"?" w":""}">${r[0]}</span><span class="v">${esc(r[1])}</span></div>`).join("");
 }
 function setCaption(){
   if(cur===4){$("#cap").textContent=SUBCAP[sub][0];$("#hint").textContent=SUBCAP[sub][1]}
   else if(cur===6){$("#cap").textContent=GCAP[sub][0];$("#hint").textContent=GCAP[sub][1]}
+  else if(cur===7){$("#cap").textContent=SGCAP[sub][0];$("#hint").textContent=SGCAP[sub][1]}
   else{$("#cap").textContent=CAPS[cur][0];$("#hint").textContent=CAPS[cur][1]}
   setStory();layoutStage();
 }
 function applyRecCam(){
-  const k=cur===6?gd:rec;
-  if(cur===4||cur===6){k.ps=Math.min(VW*.94/540,VH*.97/510,2.6);k.px=600-REC_XS[sub]*k.ps;k.py=360}
+  const k=cur===7?sg:cur===6?gd:rec;
+  if(cur===4||cur===6||cur===7){k.ps=Math.min(VW*.94/540,VH*.97/510,2.6);k.px=600-REC_XS[sub]*k.ps;k.py=360}
   else{rec.ps=.34;rec.px=600-1090*.34;rec.py=360}
 }
 function goStage(i,keep,s){
@@ -1337,12 +1555,13 @@ function goStage(i,keep,s){
   if(i===3)hubRefresh();
   if(i===4)rec.T[sub]=0;
   if(i===6)gd.T[sub]=0;
+  if(i===7)sg.T[sub]=0;
   if(i===-2)why.t=0;
   applyRecCam();
   buildCtl();
   try{history.replaceState(null,"","#"+HASHES[i+2])}catch(e){}
 }
-function goSub(j){sub=j;(cur===6?gd:rec).T[j]=0;applyRecCam();setCaption();buildCtl()}
+function goSub(j){sub=j;(cur===7?sg:cur===6?gd:rec).T[j]=0;applyRecCam();setCaption();buildCtl()}
 function buildCtl(){
   const c=$("#ctl");let h="";
   const roles=(all,label)=>`<div class="chips" role="group" aria-label="Role">${label?`<span class="chip">${label}</span>`:""}`+(all?`<button class="chip" data-role="all" aria-pressed="${lrn.all}">All roles</button>`:"")+Object.keys(ROLEN).map(k=>`<button class="chip" data-role="${k}" aria-pressed="${k===ROLE&&!(all&&lrn.all)}"><i style="background:${ROLEC[k]}"></i>${ROLEN[k]}</button>`).join("")+`</div>`;
@@ -1354,7 +1573,7 @@ function buildCtl(){
   if(cur===2)h=`<div class="chips"><span class="chip"><i style="background:${PARTC.graph}"></i>Skills and how they relate</span><span class="chip"><i style="background:${PARTC.jobs}"></i>Jobs</span><span class="chip"><i style="background:${PARTC.cand}"></i>People</span><span class="chip"><i style="background:${PARTC.elig}"></i>Rules</span></div>`;
   if(cur===3){
     const u=UCS[hub.sel];
-    h=`<div class="chips"><span class="chip" style="border-color:var(--accent)">${esc(u[0])}</span><span class="chip">Searches</span>`+u[3].map(k=>`<span class="chip"><i style="background:${PARTC[k]}"></i>${PARTN[k]}</span>`).join("")+`</div><div class="chips">`+(hub.sel===0?`<button class="chip primary" data-open="rec">See how it works →</button>`:hub.sel===3?`<button class="chip primary" data-open="guide">See how it works →</button>`:`<span class="chip">Step-by-step breakdown coming next</span>`)+`</div>`;
+    h=`<div class="chips"><span class="chip" style="border-color:var(--accent)">${esc(u[0])}</span><span class="chip">Searches</span>`+u[3].map(k=>`<span class="chip"><i style="background:${PARTC[k]}"></i>${PARTN[k]}</span>`).join("")+`</div><div class="chips">`+(hub.sel===0?`<button class="chip primary" data-open="rec">See how it works →</button>`:hub.sel===3?`<button class="chip primary" data-open="guide">See how it works →</button>`:hub.sel===4?`<button class="chip primary" data-open="sched">See how it works →</button>`:`<span class="chip">Step-by-step breakdown coming next</span>`)+`</div>`;
   }
   if(cur===4){
     h=`<div class="chips" role="group" aria-label="Step">`+["Read job","Widen","Find people","Check","Rank"].map((n,i)=>`<button class="chip" data-sub="${i}" aria-pressed="${i===sub}">${i+1} ${n}</button>`).join("")+`</div>`+roles(false,"Open workflow for")+
@@ -1363,6 +1582,9 @@ function buildCtl(){
   if(cur===6){
     h=`<div class="chips" role="group" aria-label="Step">`+["Open","Proven?","Pick","Write","Interview"].map((n,i)=>`<button class="chip" data-sub="${i}" aria-pressed="${i===sub}">${i+1} ${n}</button>`).join("")+`</div>`+roles(false,"Interview for")+(sub>=1&&sub<=3?`<div class="chips"><button class="chip" id="adjBtn" aria-pressed="${REC.adj}">Use related skills</button></div>`:"");
     if(sub===1)h+=`<div class="chips"><span class="chip"><i style="background:${EVC.V}"></i>Proven</span><span class="chip"><i style="background:${EVC.D}"></i>Shown</span><span class="chip"><i class="hol" style="color:#8CA39E"></i>Stated</span><span class="chip"><i class="hol" style="color:#6CD0F5"></i>Related</span><span class="chip"><i style="background:#2A3B57"></i>None</span></div>`;
+  }
+  if(cur===7){
+    h=`<div class="chips" role="group" aria-label="Step">`+["Request","Map","Rules","Rank","Propose"].map((n,i)=>`<button class="chip" data-sub="${i}" aria-pressed="${i===sub}">${i+1} ${n}</button>`).join("")+`</div>`+roles(false,"Round 2 for")+(sub===1||sub===3?`<div class="chips"><button class="chip" id="adjBtn" aria-pressed="${REC.adj}">Use related skills</button></div>`:"");
   }
   if(cur===5)h=`<div class="chips"><button class="chip" data-restart="1">Replay from the start</button></div>`;
   c.innerHTML=h;layoutStage();
@@ -1374,19 +1596,20 @@ $("#ctl").addEventListener("click",e=>{
     if(cur===1){lrn.sel=null;lrn.autoAt=lrn.t+1.8;lrnRefresh()}
     if(cur===4){recBuild();applyRecCam();rec.T[sub]=0;setStory()}
     if(cur===6){gdBuild();applyRecCam();gd.T[sub]=0;setStory()}
+    if(cur===7){sgBuild();applyRecCam();sg.T[sub]=0;setStory()}
     buildCtl();return;
   }
   const sb=e.target.closest("[data-sub]");if(sb){goSub(+sb.dataset.sub);return}
-  {const o=e.target.closest("[data-open]");if(o){goStage(o.dataset.open==="guide"?6:4,false,0);return}}
+  {const o=e.target.closest("[data-open]");if(o){goStage(o.dataset.open==="guide"?6:o.dataset.open==="sched"?7:4,false,0);return}}
   if(e.target.closest("[data-next]")){step(1);return}
   if(e.target.closest("[data-restart]")){goStage(-2);return}
-  if(e.target.closest("#adjBtn")){REC.adj=!REC.adj;recBuild();gdBuild();applyRecCam();setStory();buildCtl();return}
+  if(e.target.closest("#adjBtn")){REC.adj=!REC.adj;recBuild();gdBuild();sgBuild();applyRecCam();setStory();buildCtl();return}
   if(e.target.closest("#decayBtn")){REC.decay=!REC.decay;recBuild();applyRecCam();rec.T[4]=0;setStory();buildCtl()}
 });
 (function(){
   const s=$("#steps");
   s.innerHTML=`<button class="stp arr" data-d="-1" aria-label="Previous">‹</button><button class="stp" data-i="-2">Why</button><button class="stp" data-i="-1">Overview</button><span class="grp">Build once</span>`+
-    ["Match","Learn","Save"].map((n,i)=>`<button class="stp" data-i="${i}"><i>${i+1}</i>${n}</button>`).join("")+`<span class="grp">Use</span><button class="stp" data-i="3">Use cases</button><button class="stp" data-i="4">Recommendation</button><button class="stp" data-i="6">Interview guides</button><span class="grp"></span><button class="stp" data-i="5">Summary</button><button class="stp arr" data-d="1" aria-label="Next">›</button>`;
+    ["Match","Learn","Save"].map((n,i)=>`<button class="stp" data-i="${i}"><i>${i+1}</i>${n}</button>`).join("")+`<span class="grp">Use</span><button class="stp" data-i="3">Use cases</button><button class="stp" data-i="4">Recommendation</button><button class="stp" data-i="6">Interview guides</button><button class="stp" data-i="7">Interviewer suggestions</button><span class="grp"></span><button class="stp" data-i="5">Summary</button><button class="stp arr" data-d="1" aria-label="Next">›</button>`;
   s.addEventListener("click",e=>{
     const b=e.target.closest(".stp");if(!b)return;
     if(b.dataset.d){step(+b.dataset.d)}else goStage(+b.dataset.i);
@@ -1433,19 +1656,20 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(layoutStage);
 let last=performance.now();
 function frame(now){
   const dt=Math.max(0,Math.min(.05,(now-last)/1000));last=now;
-  matchUpdate(dt);lrnUpdate(dt);savUpdate(dt);hubUpdate(dt);recUpdate(dt);gdUpdate(dt);ovUpdate(dt);whyUpdate(dt);
+  matchUpdate(dt);lrnUpdate(dt);savUpdate(dt);hubUpdate(dt);recUpdate(dt);gdUpdate(dt);sgUpdate(dt);ovUpdate(dt);whyUpdate(dt);
   requestAnimationFrame(frame);
 }
 
 /* ---------- boot ---------- */
 resize();
-recBuild();gdBuild();lrnRefresh();hubRefresh();
+recBuild();gdBuild();sgBuild();lrnRefresh();hubRefresh();
 rec.tx=600-1090*.34;rec.ty=360;rec.s=.34;rec.px=rec.tx;rec.py=rec.ty;rec.ps=.34;
 const h0=(location.hash||"").replace("#","").toLowerCase();
 const start=HASHES.indexOf(h0)-2;
 goStage(start>=-2&&h0?start:-2,false,0);
 if(cur===4){rec.tx=rec.px;rec.ty=rec.py;rec.s=rec.ps}
 if(cur===6){gd.tx=gd.px;gd.ty=gd.py;gd.s=gd.ps}
+if(cur===7){sg.tx=sg.px;sg.ty=sg.py;sg.s=sg.ps}
 requestAnimationFrame(frame);
 addEventListener("hashchange",()=>{const i=HASHES.indexOf((location.hash||"").replace("#","").toLowerCase())-2;if(i>=-2&&i!==cur)goStage(i,false,0)});
 })();

@@ -2,7 +2,7 @@
 
 An interactive walkthrough of how interview transcripts and job titles become a per-company skill ontology, and how use cases (starting with candidate recommendation) search it.
 
-- Covers the whole pipeline, then step-by-step breakdowns of two use cases: candidate recommendation and interview guides.
+- Covers the whole pipeline, then step-by-step breakdowns of three use cases: candidate recommendation, interview guides and interviewer suggestions.
 - Open `index.html` in a browser, or use the GitHub Pages site for this repo.
 - Navigate with the arrow keys or the step bar. Space starts an auto tour.
 - All names, numbers and transcripts are fictitious sample data.
